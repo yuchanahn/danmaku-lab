@@ -1,0 +1,9 @@
+/out/
+/.vs/
+/.vscode/
+/build/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.log

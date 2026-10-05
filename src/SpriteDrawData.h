@@ -23,6 +23,12 @@ enum class SpriteTextureId {
   White = 2,
   Player = 3,
   Enemy = 4,
+  ForestBackground = 5,
+  FogBackground = 6,
+  Enemy1,
+  Enemy2,
+  MidBoss,
+  FinalBoss,
   Count,
 };
 
@@ -35,6 +41,7 @@ enum class SpriteShape {
   Rectangle = 0,
   SoftCircle = 1,
   GlowCircle = 2,
+  BulletBody = 3,
 };
 
 enum class SpriteBlendMode {

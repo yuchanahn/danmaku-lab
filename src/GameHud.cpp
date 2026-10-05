@@ -5,7 +5,11 @@
 #include <algorithm>
 #include <format>
 
-GameHud::GameHud() { enemyHealthBar_.SetSize({240.0f, 12.0f}); }
+GameHud::GameHud() {
+  healthBar_.SetSize({60.0f, 6.0f});
+  enemyHealthBar_.SetSize({240.0f, 12.0f});
+  minionHealthBar_.SetSize({60.0f, 5.0f});
+}
 
 void GameHud::RenderBackground(Graphics &graphics_, float width, float height,
                                bool brightBackground_) {
@@ -53,13 +57,27 @@ void GameHud::RenderHealthBars(const GameScene &scene,
   enemyHealthBar_.SetValue(static_cast<float>(scene.GetEnemy().GetHp()) /
                            static_cast<float>(scene.GetEnemy().GetMaxHp()));
   enemyHealthBar_.SetPosition({PlayfieldLayout::kWidth * 0.5f, 32.0f});
-  if (scene.GetEnemy().GetHp() > 0) {
+  if (scene.HasBoss() && scene.GetEnemy().GetHp() > 0) {
     for (const auto &sprite : enemyHealthBar_.GetSprites()) {
       renderer.DrawGameSprite(sprite);
     }
   }
   if (scene.GetPlayer().GetHp() > 0) {
     for (const auto &sprite : healthBar_.GetSprites()) {
+      renderer.DrawGameSprite(sprite);
+    }
+  }
+  for (const auto &minion : scene.GetMinions()) {
+    if (minion.GetLifeState() != EnemyLifeState::Alive)
+      continue;
+    minionHealthBar_.SetSize({minion.GetWidth(), 5.0f});
+    minionHealthBar_.SetValue(static_cast<float>(minion.GetHp()) /
+                              static_cast<float>(minion.GetMaxHp()));
+    const float halfHeight = minionHealthBar_.GetHeight() * 0.5f;
+    const float y =
+        minion.GetY() - minion.GetHeight() * 0.5f - kHealthBarGap - halfHeight;
+    minionHealthBar_.SetPosition({minion.GetX(), std::max(halfHeight, y)});
+    for (const auto &sprite : minionHealthBar_.GetSprites()) {
       renderer.DrawGameSprite(sprite);
     }
   }
@@ -78,15 +96,26 @@ void GameHud::RenderScreen(Graphics &graphics_, const GameScene &scene,
                             PlayfieldLayout::kHeight * layout.scale};
     const float left = bounds[0] + bounds[2] + 12.0f;
     const float panelWidth = std::min(300.0f, width - left - 12.0f);
+    const auto bossText =
+        scene.HasBoss()
+            ? std::format(L"BOSS HP  {}/{}", scene.GetEnemy().GetHp(),
+                          scene.GetEnemy().GetMaxHp())
+            : std::format(L"SPAWNED  {}/10",
+                          scene.GetStage().GetSpawnedCount());
     const auto text = std::format(
-        L"HP  {}   INVULN  {:.1f}s\nENEMY HP  {}/{}\nSCORE  {}\nGRAZE  {}\n{}",
+        L"STAGE {}/3  {}\nHP {}   INVULN {:.1f}s\n{}\nENEMIES {}\nSCORE {}   "
+        L"GRAZE {}\nDROPPED SHOTS {}\n{}\nF4: All enemies -50 HP",
+        scene.GetStage().GetStageNumber(), scene.GetStage().GetName(),
         scene.GetPlayer().GetHp(),
-        scene.GetPlayer().GetInvulnerabilitySeconds(), scene.GetEnemy().GetHp(),
-        scene.GetEnemy().GetMaxHp(), stats.score, stats.grazeCount,
+        scene.GetPlayer().GetInvulnerabilitySeconds(), bossText,
+        scene.GetMinions().size(), stats.score, stats.grazeCount,
+        scene.GetBulletSystem().GetDroppedSpawnRequests(),
         frame.paused                       ? L"PAUSED  [P: Resume]"
         : frame.state == GameState::Ending ? L"BATTLE ENDING...  P: Pause"
-                                           : L"Z: Shoot  P: Pause   F1: Debug");
-    graphics_.DrawUiPanel(text, {left, 12.0f, left + panelWidth, 148.0f});
+        : scene.GetStage().GetPhase() == StagePhase::Transitioning
+            ? L"MID BOSS DEFEATED..."
+            : L"Z: Shoot  P: Pause   F1: Debug");
+    graphics_.DrawUiPanel(text, {left, 12.0f, left + panelWidth, 240.0f});
     return;
   }
 
@@ -143,10 +172,12 @@ void GameHud::RenderDebug(Graphics &graphics_, const GameScene &scene,
         L"\n"
         L"Render State\n"
         L"Sampler: {} | Address: {}\n"
-        L"Bullet: {} | Blend: {}\n\n"
+        L"Bullet: {} | Glow Blend: {}\n\n"
         L"Controls\n"
         L"Arrows Move   Z Shoot   P Pause   F2 Background\n"
         L"F3 Dissolve preview: {:.2f}\n"
+        L"F4 Damage all enemies: 50\n"
+        L"B Enhanced bullets / Legacy controls\n"
         L"1 Full UV  2 Quarter UV  3 Flip U\n"
         L"4 Rect  5 Circle  6 Glow\n"
         L"7 Alpha  8 Additive\n"
@@ -157,7 +188,12 @@ void GameHud::RenderDebug(Graphics &graphics_, const GameScene &scene,
         stats.collisionCandidates, scene.GetGameTimeSeconds(), frame.realTime,
         frame.paused ? L"On" : L"Off", stats.playerHit ? L"YES" : L"no",
         stats.playerGraze ? L"YES" : L"no", stats.grazeCount, samplerName,
-        addressName, shapeName, blendName, visuals.dissolvePreviewProgress);
-    graphics_.DrawDebugText(overlayText);
+        addressName, visuals.enhancedBullets ? L"Enhanced" : shapeName,
+        blendName, visuals.dissolvePreviewProgress);
+    graphics_.DrawDebugText(std::format(
+        L"Stage: {}/3 | Spawn requests: {} | Dropped: {}\n{}",
+        scene.GetStage().GetStageNumber(),
+        scene.GetBulletSystem().GetSpawnRequests(),
+        scene.GetBulletSystem().GetDroppedSpawnRequests(), overlayText));
   }
 }

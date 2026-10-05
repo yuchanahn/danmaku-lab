@@ -8,13 +8,16 @@
 void GameScene::Reset() {
   player_.Reset();
   enemy_.Reset();
+  minions_.clear();
+  stage_.Reset();
+  bossPresent_ = false;
   bulletSystem_.Reset();
   enemyBulletGrid_.Clear();
   battleOutcome_ = BattleOutcome::None;
   gameTimeSeconds_ = 0.0;
   battleEndingSeconds_ = 0.0;
-  enemyShotCooldownSeconds_ = 0.0;
-  enemyFanAngleRadians_ = 0.0f;
+  summonCooldownSeconds_ = 3.0;
+  bossVolleyIndex_ = 0;
   playerMotion_ = PlayerMotion::Idle;
   visuals_.dissolvePreviewProgress = 0.0f;
   playerHit_ = false;
@@ -24,10 +27,19 @@ void GameScene::Reset() {
   shotRequestCount_ = 0;
   activeEnemyBulletCount_ = 0;
   collisionCandidateCount_ = 0;
+  StartStage();
 }
 
 bool GameScene::Update(const Input &input, double fixedDeltaSeconds) {
   if (battleOutcome_ == BattleOutcome::None) {
+    stage_.Update(fixedDeltaSeconds);
+    if (stage_.GetPhase() == StagePhase::Transitioning) {
+      enemy_.Update(fixedDeltaSeconds);
+      UpdateStageProgress();
+      gameTimeSeconds_ += fixedDeltaSeconds;
+      return false;
+    }
+    SpawnScheduledEnemies();
     const bool fired = UpdateCombat(input, fixedDeltaSeconds);
     gameTimeSeconds_ += fixedDeltaSeconds;
     return fired;
@@ -59,6 +71,7 @@ bool GameScene::UpdateCombat(const Input &input, double fixedDeltaSeconds) {
   bulletSystem_.Update(fixedDeltaSeconds);
 
   UpdateEnemyShooting(fixedDeltaSeconds);
+  UpdateMinions(fixedDeltaSeconds);
 
   const bool fired =
       player_.UpdateShooting(input.IsDown('Z'), fixedDeltaSeconds);
@@ -71,66 +84,78 @@ bool GameScene::UpdateCombat(const Input &input, double fixedDeltaSeconds) {
   CheckEnemyPlayerBulletCollisions();
   CheckPlayerEnemyBulletCollisions();
   CheckBattleOutcome();
+  if (battleOutcome_ == BattleOutcome::None)
+    UpdateStageProgress();
   bulletSystem_.RemoveOutside(kPlayfieldWidth, kPlayfieldHeight);
   return fired;
 }
 
-void GameScene::UpdateEnemyShooting(double fixedDeltaSeconds) {
-  constexpr float kFanAngularSpeedRadiansPerSecond = 0.7f;
-  enemyFanAngleRadians_ +=
-      kFanAngularSpeedRadiansPerSecond * static_cast<float>(fixedDeltaSeconds);
-
-  enemyShotCooldownSeconds_ -= fixedDeltaSeconds;
-  if (enemy_.GetHp() > enemy_.GetMaxHp() / 2 &&
-      enemyShotCooldownSeconds_ <= 0.0) {
-    constexpr int kFanBulletCount = 7;
-    constexpr float kFanBulletSpeed = 140.0f;
-    constexpr float kFanCenterAngle =
-        static_cast<float>(std::numbers::pi / 2.0);
-    constexpr float kFanSpreadAngle =
-        static_cast<float>(std::numbers::pi / 2.0);
-    float fanCenterAngle = kFanCenterAngle;
-    fanCenterAngle += enemyFanAngleRadians_;
-    DanmakuPattern::SpawnFan(bulletSystem_, enemy_.GetX(), enemy_.GetY(),
-                             kFanBulletCount, kFanBulletSpeed, fanCenterAngle,
-                             kFanSpreadAngle);
-    enemyShotCooldownSeconds_ = 1.5;
-  } else if (enemy_.GetHp() > 0 && enemyShotCooldownSeconds_ <= 0.0) {
-    constexpr int kFanBulletCount = 16;
-    constexpr float kFanBulletSpeed = 160.0f;
-
-    DanmakuPattern::SpawnRing(bulletSystem_, enemy_.GetX(), enemy_.GetY(),
-                              kFanBulletCount, kFanBulletSpeed,
-                              enemyFanAngleRadians_);
-    enemyShotCooldownSeconds_ = 1.0;
-  }
-}
-
 void GameScene::CheckEnemyPlayerBulletCollisions() {
-
-  constexpr float kEnemyHitRadius = 24.0f;
-  constexpr float kPlayerBulletHitRadius = 4.0f;
-  const CircleHitbox Hitbox{
-      enemy_.GetX(),
-      enemy_.GetY(),
-      kEnemyHitRadius,
-  };
-
   for (auto &bullet : bulletSystem_.GetBullets()) {
     if (!bullet.active || bullet.owner != BulletOwner::Player)
       continue;
     const CircleHitbox bulletHitbox{
         bullet.x,
         bullet.y,
-        kPlayerBulletHitRadius,
+        GetBulletStyle(bullet.type).hitRadius,
     };
-    const bool bulletHits = Intersects(Hitbox, bulletHitbox);
-
-    if (bulletHits) {
+    const auto tryHit = [&](Enemy &target) {
+      if (target.GetLifeState() != EnemyLifeState::Alive)
+        return false;
+      if (!Intersects({target.GetX(), target.GetY(), target.GetHitRadius()},
+                      bulletHitbox))
+        return false;
       bullet.active = false;
-      (void)enemy_.TryTakeDamage();
+      DamageEnemy(target, 1);
+      return true;
+    };
+    if (bossPresent_ && tryHit(enemy_))
+      continue;
+    for (auto &minion : minions_) {
+      if (tryHit(minion))
+        break;
     }
   }
+}
+
+void GameScene::DamageEnemy(Enemy &enemy, int damage) {
+  if (enemy.TryTakeDamage(damage) && enemy.GetHp() == 0)
+    score_ += enemy.GetKind() == EnemyKind::FinalBoss ? 5000
+              : enemy.GetKind() == EnemyKind::MidBoss ? 1000
+                                                      : 100;
+}
+
+void GameScene::ApplyDamageCheat() {
+  if (battleOutcome_ != BattleOutcome::None ||
+      stage_.GetPhase() != StagePhase::Running)
+    return;
+  if (bossPresent_)
+    DamageEnemy(enemy_, 50);
+  for (auto &minion : minions_)
+    DamageEnemy(minion, 50);
+  CheckBattleOutcome();
+  if (battleOutcome_ == BattleOutcome::None)
+    UpdateStageProgress();
+}
+
+void GameScene::UpdateMinions(double fixedDeltaSeconds) {
+  for (auto &minion : minions_) {
+    minion.Update(fixedDeltaSeconds);
+    if (!minion.ConsumeShot())
+      continue;
+    const float angle = std::atan2(player_.GetY() - minion.GetY(),
+                                   player_.GetX() - minion.GetX());
+    if (minion.GetKind() == EnemyKind::Enemy1) {
+      DanmakuPattern::SpawnFan(bulletSystem_, minion.GetX(), minion.GetY(), 1,
+                               140.0f, angle, 0.0f, BulletType::Normal);
+    } else {
+      DanmakuPattern::SpawnFan(bulletSystem_, minion.GetX(), minion.GetY(), 3,
+                               120.0f, angle, 0.5f, BulletType::Thin);
+    }
+  }
+  std::erase_if(minions_, [](const Enemy &minion) {
+    return minion.GetLifeState() == EnemyLifeState::Removed;
+  });
 }
 
 void GameScene::RebuildEnemyBulletGrid() {
@@ -166,7 +191,6 @@ void GameScene::RebuildEnemyBulletGrid() {
 void GameScene::CheckPlayerEnemyBulletCollisions() {
   constexpr float kPlayerHitRadius = 5.0f;
   constexpr float kPlayerGrazeRadius = 24.0f;
-  constexpr float kEnemyBulletHitRadius = 8.0f;
 
   playerHit_ = false;
   playerGraze_ = false;
@@ -207,7 +231,7 @@ void GameScene::CheckPlayerEnemyBulletCollisions() {
         const CircleHitbox bulletHitbox{
             bullet.x,
             bullet.y,
-            kEnemyBulletHitRadius,
+            GetBulletStyle(bullet.type).hitRadius,
         };
 
         ++collisionCandidateCount_;
@@ -237,14 +261,29 @@ void GameScene::CheckBattleOutcome() {
     return;
   if (player_.GetHp() == 0) {
     battleOutcome_ = BattleOutcome::Failed;
-  } else if (enemy_.GetHp() == 0) {
+  } else if (stage_.GetStageNumber() == 3 && bossPresent_ &&
+             enemy_.GetHp() == 0) {
     battleOutcome_ = BattleOutcome::Clear;
+    stage_.Finish();
+    bulletSystem_.Clear();
+    activeEnemyBulletCount_ = collisionCandidateCount_ = 0;
+    for (auto &minion : minions_) {
+      while (minion.GetHp() > 0)
+        (void)minion.TryTakeDamage();
+    }
   }
   if (battleOutcome_ != BattleOutcome::None)
     battleEndingSeconds_ = 0.0;
 }
 
 void GameScene::UpdateBattleEnding(double fixedDeltaSeconds) {
+  for (auto &minion : minions_) {
+    if (minion.GetLifeState() == EnemyLifeState::Dying)
+      minion.Update(fixedDeltaSeconds);
+  }
+  std::erase_if(minions_, [](const Enemy &minion) {
+    return minion.GetLifeState() == EnemyLifeState::Removed;
+  });
   battleEndingSeconds_ = std::min(kDeathDissolveDurationSeconds,
                                   battleEndingSeconds_ + fixedDeltaSeconds);
 }
@@ -274,6 +313,9 @@ SceneStatistics GameScene::GetStatistics() const {
 }
 
 void GameScene::HandleVisualControls(const Input &input, bool allowPreview) {
+  if (input.GetKeyState('B') == Input::KeyState::Pressed) {
+    visuals_.enhancedBullets = !visuals_.enhancedBullets;
+  }
   if (allowPreview && input.GetKeyState(VK_F3) == Input::KeyState::Pressed) {
     visuals_.dissolvePreviewProgress += 0.25f;
     if (visuals_.dissolvePreviewProgress > 1.0f) {

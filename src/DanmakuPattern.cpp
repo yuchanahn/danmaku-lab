@@ -8,7 +8,7 @@ namespace DanmakuPattern {
 
 void SpawnRing(BulletSystem &bulletSystem, float centerX, float centerY,
                int bulletCount, float speedPixelsPerSecond,
-               float startAngleRadians) {
+               float startAngleRadians, BulletType type) {
   if (bulletCount <= 0 || speedPixelsPerSecond <= 0.0f) {
     return;
   }
@@ -19,13 +19,14 @@ void SpawnRing(BulletSystem &bulletSystem, float centerX, float centerY,
     bulletSystem.Spawn(centerX, centerY,
                        std::cos(r + startAngleRadians) * speedPixelsPerSecond,
                        std::sin(r + startAngleRadians) * speedPixelsPerSecond,
-                       BulletOwner::Enemy);
+                       BulletOwner::Enemy, type);
   }
 }
 
 void SpawnFan(BulletSystem &bulletSystem, float centerX, float centerY,
               int bulletCount, float speedPixelsPerSecond,
-              float centerAngleRadians, float spreadAngleRadians) {
+              float centerAngleRadians, float spreadAngleRadians,
+              BulletType type) {
   if (bulletCount <= 0 || speedPixelsPerSecond <= 0.0f ||
       spreadAngleRadians < 0.0f) {
     return;
@@ -35,7 +36,7 @@ void SpawnFan(BulletSystem &bulletSystem, float centerX, float centerY,
     bulletSystem.Spawn(centerX, centerY,
                        std::cos(centerAngleRadians) * speedPixelsPerSecond,
                        std::sin(centerAngleRadians) * speedPixelsPerSecond,
-                       BulletOwner::Enemy);
+                       BulletOwner::Enemy, type);
     return;
   }
 
@@ -45,8 +46,8 @@ void SpawnFan(BulletSystem &bulletSystem, float centerX, float centerY,
               spreadAngleRadians * t;
 
     bulletSystem.Spawn(centerX, centerY, std::cos(r) * speedPixelsPerSecond,
-                       std::sin(r) * speedPixelsPerSecond,
-                       BulletOwner::Enemy);
+                       std::sin(r) * speedPixelsPerSecond, BulletOwner::Enemy,
+                       type);
   }
 }
 

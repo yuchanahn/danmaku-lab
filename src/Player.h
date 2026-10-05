@@ -29,8 +29,8 @@ private:
   double invulnerabilitySeconds_ = 0.0;
   float x_ = 360.0f;
   float y_ = 800.0f;
-  float width_ = 48.0f;
-  float height_ = 48.0f;
+  float width_ = 80.0f;
+  float height_ = 80.0f;
   float speedPixelsPerSecond_ = 240.0f;
   static constexpr double kShotIntervalSeconds = 0.15;
   double shotCooldownSeconds_ = 0.0;

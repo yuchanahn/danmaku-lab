@@ -37,8 +37,10 @@ VSOutput VSMain(VSInput input)
 {
     VSOutput output;
     float2 localPosition = float2(input.position.x, -input.position.y);
-    float2 rotatedPosition = RotateLocalPosition(localPosition, spriteRotationRadians);
-    float2 pixelPosition = spriteCenter + rotatedPosition * spriteSize;
+
+    float2 rotatedPosition = RotateLocalPosition(localPosition * spriteSize, spriteRotationRadians);
+
+    float2 pixelPosition = spriteCenter + rotatedPosition;
     float2 ndcPosition = float2(
         2.0f * pixelPosition.x / screenSize.x - 1.0f,
         1.0f - 2.0f * pixelPosition.y / screenSize.y);
@@ -109,6 +111,11 @@ float ComputeGlowIntensity(float2 localUV)
     return pow(saturate(1 - normalizedDistance), kGlowFalloffExponent);
 }
 
+float ComputeBulletCoreIntensity(float normalizedDistance)
+{
+    return saturate(1.0f - normalizedDistance);
+}
+
 float HashDissolveCell(float2 cell)
 {
     return frac(sin(dot(cell, float2(127.1f, 311.7f))) * 43758.5453f);
@@ -172,7 +179,16 @@ float4 PSMain(VSOutput input) : SV_TARGET
     }
     float effectTime = spriteTimeSource > 0.5f ? realTimeSeconds : gameTimeSeconds;
     //color.rgb *= ComputePulse(effectTime);
-    if (spriteShape > 1.5f)
+    if (spriteShape > 2.5f)
+    {
+        const float kBulletCoreRadius = 0.22f;
+        float normalizedDistance = length(input.uv - float2(0.5f, 0.5f))
+                                 / kBulletCoreRadius;
+        float coreIntensity = saturate(ComputeBulletCoreIntensity(normalizedDistance));
+        color.rgb = lerp(color.rgb, float3(1.0f, 1.0f, 1.0f), coreIntensity);
+        color.a *= ComputeShapeAlpha(input.uv);
+    }
+    else if (spriteShape > 1.5f)
     {
         color.a *= ComputeGlowIntensity(input.uv);
     }

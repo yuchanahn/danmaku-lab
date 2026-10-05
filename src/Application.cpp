@@ -40,6 +40,12 @@ int Application::Run() {
       paused_ = !paused_;
       accumulatorSeconds_ = 0.0;
     }
+    if (gameState_ == GameState::Playing && !paused_ && !pauseChanged &&
+        input_.GetKeyState(VK_F4) == Input::KeyState::Pressed) {
+      gameScene_.ApplyDamageCheat();
+      if (gameScene_.GetOutcome() != BattleOutcome::None)
+        ChangeGameState(GameState::Ending);
+    }
     if ((gameState_ == GameState::Playing || gameState_ == GameState::Ending) &&
         !paused_ && !pauseChanged) {
       RunFixedUpdates(std::min(realDeltaSeconds, kMaxGameDeltaSeconds));

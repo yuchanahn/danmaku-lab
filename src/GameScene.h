@@ -6,9 +6,12 @@
 #include "Input.h"
 #include "Player.h"
 #include "PlayfieldLayout.h"
+#include "ScrollingBackground.h"
+#include "StageDirector.h"
 #include "UniformGrid.h"
 #include <array>
 #include <cstdint>
+#include <vector>
 
 class GameSpriteRenderer;
 class Graphics;
@@ -16,11 +19,12 @@ class Graphics;
 struct SceneVisualSettings {
   std::array<float, 4> playerUvRect{0.0f, 0.0f, 1.0f, 1.0f};
   SpriteShape bulletShape = SpriteShape::SoftCircle;
-  SpriteBlendMode bulletBlendMode = SpriteBlendMode::Alpha;
+  SpriteBlendMode bulletBlendMode = SpriteBlendMode::Additive;
   float playerRotationRadians = 0.0f;
-  SpriteSamplerMode playerSamplerMode = SpriteSamplerMode::Point;
+  SpriteSamplerMode playerSamplerMode = SpriteSamplerMode::Linear;
   SpriteAddressMode playerAddressMode = SpriteAddressMode::Clamp;
   float dissolvePreviewProgress = 0.0f;
+  bool enhancedBullets = true;
 };
 
 struct SceneStatistics {
@@ -39,9 +43,17 @@ public:
   // 발사 여부만 반환한다. 소리 재생과 화면 전환은 Application이 담당한다.
   [[nodiscard]] bool Update(const Input &input, double fixedDeltaSeconds);
   void HandleVisualControls(const Input &input, bool allowPreview);
+  void ApplyDamageCheat();
   void Render(const GameSpriteRenderer &renderer) const;
   [[nodiscard]] const Player &GetPlayer() const { return player_; }
   [[nodiscard]] const Enemy &GetEnemy() const { return enemy_; }
+  [[nodiscard]] bool HasBoss() const noexcept { return bossPresent_; }
+  [[nodiscard]] const StageDirector &GetStage() const noexcept {
+    return stage_;
+  }
+  [[nodiscard]] const std::vector<Enemy> &GetMinions() const {
+    return minions_;
+  }
   [[nodiscard]] const BulletSystem &GetBulletSystem() const {
     return bulletSystem_;
   }
@@ -60,9 +72,15 @@ private:
   enum class PlayerMotion { Idle, Left, Right };
   bool UpdateCombat(const Input &input, double fixedDeltaSeconds);
   void UpdateEnemyShooting(double fixedDeltaSeconds);
+  void StartStage();
+  void UpdateStageProgress();
+  void SpawnScheduledEnemies();
+  void RunStageSmokeTest(Graphics &graphics, const PlayfieldLayout &layout);
+  void UpdateMinions(double fixedDeltaSeconds);
   void RebuildEnemyBulletGrid();
   void CheckPlayerEnemyBulletCollisions();
   void CheckEnemyPlayerBulletCollisions();
+  void DamageEnemy(Enemy &enemy, int damage);
   void CheckBattleOutcome();
   void UpdateBattleEnding(double fixedDeltaSeconds);
   void RenderPlayer(const GameSpriteRenderer &renderer) const;
@@ -76,7 +94,11 @@ private:
   static constexpr std::uint64_t kGrazeScore = 100;
 
   Player player_;
+  ScrollingBackground background_;
   Enemy enemy_;
+  bool bossPresent_ = false;
+  StageDirector stage_;
+  std::vector<Enemy> minions_;
   BulletSystem bulletSystem_;
   UniformGrid enemyBulletGrid_{
       static_cast<std::size_t>(
@@ -90,8 +112,8 @@ private:
   PlayerMotion playerMotion_ = PlayerMotion::Idle;
   double gameTimeSeconds_ = 0.0;
   double battleEndingSeconds_ = 0.0;
-  double enemyShotCooldownSeconds_ = 0.0;
-  float enemyFanAngleRadians_ = 0.0f;
+  double summonCooldownSeconds_ = 3.0;
+  std::size_t bossVolleyIndex_ = 0;
   bool playerHit_ = false;
   bool playerGraze_ = false;
   std::uint64_t score_ = 0;

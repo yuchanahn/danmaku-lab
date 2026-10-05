@@ -1,29 +1,34 @@
 #include "BulletSystem.h"
+#include <algorithm>
+#include <cmath>
 
 BulletSystem::BulletSystem() { bullets_.resize(kPoolCapacity); }
 
 void BulletSystem::Reset() noexcept {
+  spawnRequests_ = droppedSpawnRequests_ = 0;
   for (auto &bullet : bullets_) {
     bullet = Bullet{};
   }
 }
+void BulletSystem::Clear() noexcept {
+  for (auto &bullet : bullets_)
+    bullet.active = false;
+}
 
 void BulletSystem::Spawn(float centerX, float centerY) {
-  Spawn(centerX, centerY, 0.0f, -480.0f, BulletOwner::Player);
+  Spawn(centerX, centerY, 0.0f, -480.0f, BulletOwner::Player, BulletType::Thin);
 }
 
 void BulletSystem::Spawn(float centerX, float centerY, float velocityX,
-                         float velocityY, BulletOwner owner) {
+                         float velocityY, BulletOwner owner, BulletType type) {
+  ++spawnRequests_;
   auto target = std::ranges::find(bullets_, false, &Bullet::active);
   if (target != bullets_.end()) {
-    *target = Bullet{centerX, centerY,
-                     velocityX,
-                     velocityY,
-                     20.0f,   // width
-                     20.0f,   // height
-                     owner,
-                     false,
-                     true};
+    const auto style = GetBulletStyle(type);
+    *target = Bullet{centerX,      centerY, velocityX, velocityY, style.width,
+                     style.height, owner,   false,     true,      type};
+  } else {
+    ++droppedSpawnRequests_;
   }
 }
 
@@ -47,8 +52,9 @@ void BulletSystem::RemoveOutside(float screenWidth, float screenHeight) {
       continue;
     }
 
-    const float halfWidth = bullet.width * 0.5f;
-    const float halfHeight = bullet.height * 0.5f;
+    // 회전 각도와 무관한 외접원으로 화면 밖 판정의 조기 반환을 방지한다.
+    const float halfWidth = std::hypot(bullet.width, bullet.height) * 0.5f;
+    const float halfHeight = halfWidth;
     const bool outside =
         bullet.x + halfWidth < 0.0f || bullet.x - halfWidth > screenWidth ||
         bullet.y + halfHeight < 0.0f || bullet.y - halfHeight > screenHeight;

@@ -120,7 +120,33 @@ TextureCache::LoadTextureFromFile(const std::filesystem::path &path) const {
 
 std::filesystem::path TextureCache::GetTexturePath(SpriteTextureId id) const {
 
-  if (id != SpriteTextureId::Player && id != SpriteTextureId::Enemy) {
+  const wchar_t *filename = nullptr;
+  switch (id) {
+  case SpriteTextureId::Player:
+    filename = L"player.png";
+    break;
+  case SpriteTextureId::Enemy:
+    filename = L"Enemy.png";
+    break;
+  case SpriteTextureId::Enemy1:
+    filename = L"Enemy1.png";
+    break;
+  case SpriteTextureId::Enemy2:
+    filename = L"Enemy2.png";
+    break;
+  case SpriteTextureId::MidBoss:
+    filename = L"boss1.png";
+    break;
+  case SpriteTextureId::FinalBoss:
+    filename = L"boss2.png";
+    break;
+  case SpriteTextureId::ForestBackground:
+    filename = L"bg0.png";
+    break;
+  case SpriteTextureId::FogBackground:
+    filename = L"bg1.png";
+    break;
+  default:
     throw std::invalid_argument("This texture ID has no file-backed texture.");
   }
 
@@ -129,13 +155,8 @@ std::filesystem::path TextureCache::GetTexturePath(SpriteTextureId id) const {
     throw std::runtime_error("Failed to locate the executable path.");
   }
 
-  if (id == SpriteTextureId::Enemy) {
-    return std::filesystem::path(executablePath).parent_path() / L"assets" /
-           L"Enemy.png";
-  }
-
   return std::filesystem::path(executablePath).parent_path() / L"assets" /
-         L"player.png";
+         filename;
 }
 
 ID3D11ShaderResourceView *TextureCache::Get(SpriteTextureId id) {

@@ -33,4 +33,5 @@ public:
 private:
   HealthBar healthBar_;
   HealthBar enemyHealthBar_;
+  HealthBar minionHealthBar_;
 };

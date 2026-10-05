@@ -24,6 +24,74 @@ void GameScene::RunSmokeTest(Graphics &graphics,
   const auto closeEnough = [](float a, float b) {
     return std::abs(a - b) < 0.00001f;
   };
+  RunStageSmokeTest(graphics, layout);
+  const auto prepareFinalBoss = [&] {
+    stage_.Reset();
+    stage_.Advance();
+    stage_.Advance();
+    StartStage();
+  };
+  require(
+      closeEnough(CalculateBackgroundScrollOffset(0.0, 40.0f, 960.0f), 0.0f) &&
+          closeEnough(CalculateBackgroundScrollOffset(23.5, 40.0f, 960.0f),
+                      940.0f) &&
+          closeEnough(CalculateBackgroundScrollOffset(24.0, 40.0f, 960.0f),
+                      0.0f) &&
+          closeEnough(CalculateBackgroundScrollOffset(24.5, 40.0f, 960.0f),
+                      20.0f),
+      "Background scroll did not wrap at a full tile height.");
+  Enemy testEnemyA(EnemyKind::Enemy1, 200.0f, 180.0f);
+  Enemy testEnemyB(EnemyKind::Enemy2, 520.0f, 180.0f);
+  testEnemyA.Update(0.6);
+  testEnemyB.Update(0.0);
+  testEnemyA.Update(0.4);
+  testEnemyB.Update(0.4);
+  require(testEnemyA.ConsumeShot() && !testEnemyB.ConsumeShot(),
+          "Enemies shared a firing cooldown.");
+  require(testEnemyA.GetY() > 180.0f,
+          "Enemy straight movement did not advance.");
+  while (testEnemyA.GetHp() > 0)
+    (void)testEnemyA.TryTakeDamage();
+  const float deadEnemyY = testEnemyA.GetY();
+  testEnemyA.Update(0.4);
+  require(testEnemyA.GetLifeState() == EnemyLifeState::Dying &&
+              closeEnough(testEnemyA.GetDissolveProgress(), 0.5f) &&
+              testEnemyA.GetY() == deadEnemyY && !testEnemyA.ConsumeShot() &&
+              !testEnemyA.TryTakeDamage(),
+          "Dying enemy moved, fired or accepted damage.");
+  testEnemyA.Update(0.4);
+  require(testEnemyA.GetLifeState() == EnemyLifeState::Removed,
+          "Enemy was not removable after its dissolve.");
+  Reset();
+  require(minions_.size() == 1 && !HasBoss(),
+          "Stage one initial spawn failed.");
+  while (minions_.front().GetHp() > 0)
+    (void)minions_.front().TryTakeDamage();
+  CheckBattleOutcome();
+  require(battleOutcome_ == BattleOutcome::None,
+          "An ordinary enemy death ended the battle.");
+  UpdateMinions(0.8);
+  require(minions_.empty(), "Dissolved ordinary enemy was not erased.");
+  Reset();
+  bulletSystem_.Spawn(player_.GetX() + 11.0f, player_.GetY(), 0.0f, 0.0f,
+                      BulletOwner::Enemy, BulletType::Thin);
+  RebuildEnemyBulletGrid();
+  CheckPlayerEnemyBulletCollisions();
+  require(player_.GetHp() == player_.GetMaxHp() && playerGraze_,
+          "Thin bullet should graze without hitting at this distance.");
+  const auto &thin = bulletSystem_.GetBullets().front();
+  require(thin.type == BulletType::Thin && thin.width == 28.0f &&
+              thin.height == 8.0f,
+          "Thin bullet style was not applied on spawn.");
+  render();
+  Reset();
+  bulletSystem_.Spawn(player_.GetX() + 11.0f, player_.GetY(), 0.0f, 0.0f,
+                      BulletOwner::Enemy, BulletType::Normal);
+  RebuildEnemyBulletGrid();
+  CheckPlayerEnemyBulletCollisions();
+  require(player_.GetHp() == player_.GetMaxHp() - 1,
+          "Normal bullet should hit at the same distance.");
+  Reset();
   SpriteAnimationData testAnimation{6, 3, 6, 6, 12.0, true};
   const auto firstUv = CalculateSpriteAnimationUv(testAnimation, 0.0);
   const auto lastUv = CalculateSpriteAnimationUv(testAnimation, 5.0 / 12.0);
@@ -109,6 +177,7 @@ void GameScene::RunSmokeTest(Graphics &graphics,
   require(bulletSystem_.GetActiveCount() == 0,
           "Bullet survived outside the playfield in a side panel.");
 
+  prepareFinalBoss();
   bulletSystem_.Spawn(enemy_.GetX(), enemy_.GetY(), 0.0f, 0.0f,
                       BulletOwner::Player);
   CheckEnemyPlayerBulletCollisions();
@@ -132,6 +201,15 @@ void GameScene::RunSmokeTest(Graphics &graphics,
 
   bulletSystem_.Spawn(player_.GetX(), player_.GetY() - 40.0f);
   visuals_.bulletShape = SpriteShape::GlowCircle;
+  visuals_.enhancedBullets = false;
+  render();
+  testCombatInput.SetKeyDown('B', true);
+  HandleVisualControls(testCombatInput, true);
+  require(visuals_.enhancedBullets, "Enhanced bullet rendering toggle failed.");
+  testCombatInput.Reset();
+  visuals_.bulletBlendMode = SpriteBlendMode::Alpha;
+  render();
+  visuals_.bulletBlendMode = SpriteBlendMode::Additive;
   render();
   while (enemy_.GetHp() > 0) {
     (void)enemy_.TryTakeDamage();
@@ -171,6 +249,7 @@ void GameScene::RunSmokeTest(Graphics &graphics,
               gameTimeSeconds_ == 0.0 && battleEndingSeconds_ == 0.0 &&
               visuals_.dissolvePreviewProgress == 0.0f,
           "Restart retained previous battle state.");
+  prepareFinalBoss();
   while (enemy_.GetHp() > 0) {
     (void)enemy_.TryTakeDamage();
   }

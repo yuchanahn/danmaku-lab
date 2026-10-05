@@ -1,6 +1,5 @@
 #include "HealthBar.hpp"
-#include "SpriteDrawData.h"
-#include <array>
+#include <algorithm>
 
 HealthBar::HealthBar() {
   barSprite_ = {
@@ -34,7 +33,7 @@ HealthBar::HealthBar() {
 }
 
 void HealthBar::SetValue(float value) {
-  value_ = value;
+  value_ = std::clamp(value, 0.0f, 1.0f);
   UpdateSprites();
 }
 void HealthBar::SetPosition(std::array<float, 2> position) {
@@ -46,8 +45,10 @@ void HealthBar::SetPosition(std::array<float, 2> position) {
 void HealthBar::setVisible(bool visible) { visible_ = visible; }
 
 void HealthBar::SetSize(std::array<float, 2> size) {
-  barBackgroundSprite_.size = size;
-  barSprite_.size = size;
+  const std::array<float, 2> boundedSize{
+      std::max(0.0f, size[0]), std::max(0.0f, size[1])};
+  barBackgroundSprite_.size = boundedSize;
+  barSprite_.size = boundedSize;
   UpdateSprites();
 }
 

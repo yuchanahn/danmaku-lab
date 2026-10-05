@@ -31,6 +31,7 @@ private:
 
   static AudioClip LoadPcmWav(const std::filesystem::path &path);
   static std::filesystem::path GetAssetPath(const wchar_t *fileName);
+  void DestroyVoices() noexcept;
 
   Microsoft::WRL::ComPtr<IXAudio2> xaudio2_;
   IXAudio2MasteringVoice *masteringVoice_ = nullptr;

@@ -1,12 +1,29 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
+
+// 행 우선으로 배열한 동일 크기 셀의 재생 규격. 재생 상태/GPU 리소스는 없다.
+struct SpriteAnimationData {
+  std::size_t columns = 1;
+  std::size_t rows = 1;
+  std::size_t firstFrame = 0;
+  std::size_t frameCount = 1;
+  double framesPerSecond = 12.0;
+  bool loop = true;
+};
+
+[[nodiscard]] std::array<float, 4>
+CalculateSpriteAnimationUv(const SpriteAnimationData &animation,
+                           double elapsedSeconds);
 
 enum class SpriteTextureId {
   Checker = 0,
   Yellow = 1,
   White = 2,
   Player = 3,
+  Enemy = 4,
+  Count,
 };
 
 enum class SpriteTimeSource {
@@ -49,4 +66,9 @@ struct SpriteDrawData {
   float rotationRadians = 0.0f;
   SpriteSamplerMode samplerMode = SpriteSamplerMode::Point;
   SpriteAddressMode addressMode = SpriteAddressMode::Clamp;
+  float dissolveProgress = 0.0f;
+  float dissolveNoiseScale = 14.0f;
+  float dissolveEdgeWidth = 0.08f;
+  float dissolveEdgeStrength = 2.0f;
+  std::array<float, 4> dissolveEdgeColor{0.15f, 0.8f, 1.0f, 1.0f};
 };

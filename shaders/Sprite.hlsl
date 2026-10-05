@@ -57,6 +57,11 @@ cbuffer SpriteTintConstants : register(b1)
     float spriteShape;
     float2 spriteTintPadding;
     float4 spriteUVRect;
+    float dissolveProgress;
+    float dissolveNoiseScale;
+    float dissolveEdgeWidth;
+    float dissolveEdgeStrength;
+    float4 dissolveEdgeColor;
 };
 
 cbuffer FrameConstants : register(b2)
@@ -104,10 +109,67 @@ float ComputeGlowIntensity(float2 localUV)
     return pow(saturate(1 - normalizedDistance), kGlowFalloffExponent);
 }
 
+float HashDissolveCell(float2 cell)
+{
+    return frac(sin(dot(cell, float2(127.1f, 311.7f))) * 43758.5453f);
+}
+
+float ComputeDissolveNoise(float2 localUV)
+{
+    float2 position = localUV * max(dissolveNoiseScale, 1.0f);
+    float2 cell = floor(position);
+    float2 fraction = frac(position);
+    float2 blend = fraction * fraction * (3.0f - 2.0f * fraction);
+    float a = HashDissolveCell(cell);
+    float b = HashDissolveCell(cell + float2(1.0f, 0.0f));
+    float c = HashDissolveCell(cell + float2(0.0f, 1.0f));
+    float d = HashDissolveCell(cell + float2(1.0f, 1.0f));
+    return lerp(lerp(a, b, blend.x), lerp(c, d, blend.x), blend.y);
+}
+
+void ApplyDissolve(float noiseValue, float progress)
+{
+    if (progress <= 0.0f)
+        return;
+    if (progress >= 1.0f)
+    {
+        clip(-1.0f);
+        return;
+    }
+    if(noiseValue < progress)
+    {
+        clip(-1.0f);
+        return;
+    }
+    return;
+}
+
+float ComputeDissolveEdgeIntensity(float noiseValue, float progress, float edgeWidth)
+{
+    if (edgeWidth <= 0.0f)
+        return 0.0f;
+
+    float t = noiseValue - progress;
+
+    if(t >= 0 && t <= edgeWidth) {
+        return saturate(1 - t / edgeWidth);
+    }
+
+    return 0.0f;
+}
+
 float4 PSMain(VSOutput input) : SV_TARGET
 {
     float2 sampleUV = TransformSpriteUV(input.uv);
     float4 color = spriteTexture.Sample(spriteSampler, sampleUV) * spriteTint;
+    if (dissolveProgress > 0.0f)
+    {
+        float noiseValue = ComputeDissolveNoise(input.uv);
+        ApplyDissolve(noiseValue, dissolveProgress);
+        float edgeIntensity = ComputeDissolveEdgeIntensity(
+            noiseValue, dissolveProgress, dissolveEdgeWidth);
+        color.rgb += dissolveEdgeColor.rgb * dissolveEdgeStrength * edgeIntensity;
+    }
     float effectTime = spriteTimeSource > 0.5f ? realTimeSeconds : gameTimeSeconds;
     //color.rgb *= ComputePulse(effectTime);
     if (spriteShape > 1.5f)

@@ -119,7 +119,8 @@ TextureCache::LoadTextureFromFile(const std::filesystem::path &path) const {
 }
 
 std::filesystem::path TextureCache::GetTexturePath(SpriteTextureId id) const {
-  if (id != SpriteTextureId::Player) {
+
+  if (id != SpriteTextureId::Player && id != SpriteTextureId::Enemy) {
     throw std::invalid_argument("This texture ID has no file-backed texture.");
   }
 
@@ -128,8 +129,13 @@ std::filesystem::path TextureCache::GetTexturePath(SpriteTextureId id) const {
     throw std::runtime_error("Failed to locate the executable path.");
   }
 
+  if (id == SpriteTextureId::Enemy) {
+    return std::filesystem::path(executablePath).parent_path() / L"assets" /
+           L"Enemy.png";
+  }
+
   return std::filesystem::path(executablePath).parent_path() / L"assets" /
-         L"player_test.png";
+         L"player.png";
 }
 
 ID3D11ShaderResourceView *TextureCache::Get(SpriteTextureId id) {

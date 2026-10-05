@@ -46,6 +46,11 @@ private:
     float shape;
     std::array<float, 2> padding;
     std::array<float, 4> uvRect;
+    float dissolveProgress = 0.0f;
+    float dissolveNoiseScale = 14.0f;
+    float dissolveEdgeWidth = 0.08f;
+    float dissolveEdgeStrength = 2.0f;
+    std::array<float, 4> dissolveEdgeColor{0.15f, 0.8f, 1.0f, 1.0f};
   };
 
   struct FrameConstants {

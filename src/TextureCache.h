@@ -19,5 +19,6 @@ private:
 
   Microsoft::WRL::ComPtr<ID3D11Device> device_;
   Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory_;
-  std::array<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>, 4> textures_;
+  std::array<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>,
+             static_cast<std::size_t>(SpriteTextureId::Count)> textures_;
 };

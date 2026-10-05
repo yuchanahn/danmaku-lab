@@ -2,23 +2,49 @@
 
 #include <cstdlib>
 #include <exception>
+#include <iostream>
+#include <string>
+#include <string_view>
 #include <windows.h>
 
-int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
+namespace {
+void ReportError(const char* message, bool smokeTest) {
+  if (smokeTest) {
+    std::cerr << "SMOKE TEST FAILED: " << message << '\n';
+    return;
+  }
+  const int length = MultiByteToWideChar(CP_UTF8, 0, message, -1, nullptr, 0);
+  if (length <= 0) {
+    MessageBoxW(nullptr, L"An unexpected error occurred.", L"Danmaku Lab error",
+                MB_OK | MB_ICONERROR);
+    return;
+  }
+  std::wstring wideMessage(static_cast<std::size_t>(length), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, message, -1, wideMessage.data(), length);
+  MessageBoxW(nullptr, wideMessage.c_str(), L"Danmaku Lab error",
+              MB_OK | MB_ICONERROR);
+}
+} // namespace
+
+int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine,
+                    int showCommand) {
+  const bool smokeTest = std::wstring_view(commandLine) == L"--smoke-test";
   const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
   if (FAILED(comResult)) {
-    MessageBoxA(nullptr, "Failed to initialize COM.", "DanmakuShooter error",
-                MB_OK | MB_ICONERROR);
+    ReportError("Failed to initialize COM.", smokeTest);
     return EXIT_FAILURE;
   }
 
   int exitCode = EXIT_FAILURE;
   try {
-    Application application(instance, showCommand);
-    exitCode = application.Run();
-  } catch (const std::exception &exception) {
-    MessageBoxA(nullptr, exception.what(), "DanmakuShooter error",
-                MB_OK | MB_ICONERROR);
+    Application application(instance, smokeTest ? SW_HIDE : showCommand);
+    exitCode = smokeTest ? application.RunSmokeTest() : application.Run();
+    if (smokeTest) {
+      std::cout << "SMOKE TEST PASSED: resources, input, health bars, collision, "
+                   "invulnerability, clear, failure and restart.\n";
+    }
+  } catch (const std::exception& exception) {
+    ReportError(exception.what(), smokeTest);
   }
 
   CoUninitialize();

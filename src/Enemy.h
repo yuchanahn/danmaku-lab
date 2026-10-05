@@ -12,9 +12,9 @@ public:
   [[nodiscard]] float GetHeight() const noexcept { return height_; }
 
 private:
-  static constexpr int kMaxHp = 30;
+  static constexpr int kMaxHp = 120;
   int hp_ = kMaxHp;
-  float x_ = 640.0f;
+  float x_ = 360.0f;
   float y_ = 140.0f;
   float width_ = 56.0f;
   float height_ = 56.0f;

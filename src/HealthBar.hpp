@@ -11,6 +11,9 @@ public:
   void SetSize(std::array<float, 2> size);
   void SetPosition(std::array<float, 2> position);
   void setVisible(bool visible);
+  [[nodiscard]] float GetHeight() const noexcept {
+    return barBackgroundSprite_.size[1];
+  }
 
   std::vector<SpriteDrawData> GetSprites() const {
     if (!visible_)

@@ -9,6 +9,7 @@ public:
   [[nodiscard]] bool TryTakeDamage() noexcept;
 
   [[nodiscard]] int GetHp() const noexcept { return hp_; }
+  [[nodiscard]] int GetMaxHp() const noexcept { return kMaxHp; }
   [[nodiscard]] double GetInvulnerabilitySeconds() const noexcept {
     return invulnerabilitySeconds_;
   }
@@ -26,8 +27,8 @@ private:
   static constexpr double kInvulnerabilityDurationSeconds = 1.0;
   int hp_ = kMaxHp;
   double invulnerabilitySeconds_ = 0.0;
-  float x_ = 320.0f;
-  float y_ = 240.0f;
+  float x_ = 360.0f;
+  float y_ = 800.0f;
   float width_ = 48.0f;
   float height_ = 48.0f;
   float speedPixelsPerSecond_ = 240.0f;

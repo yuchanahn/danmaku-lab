@@ -28,35 +28,45 @@ void ReadFourCC(std::ifstream &stream, char (&fourCC)[4]) {
 } // namespace
 
 AudioSystem::AudioSystem() {
-  ThrowIfFailed(XAudio2Create(&xaudio2_, 0, XAUDIO2_DEFAULT_PROCESSOR),
-                "Failed to create XAudio2.");
-  ThrowIfFailed(xaudio2_->CreateMasteringVoice(&masteringVoice_),
-                "Failed to create the XAudio2 mastering voice.");
+  try {
+    ThrowIfFailed(XAudio2Create(&xaudio2_, 0, XAUDIO2_DEFAULT_PROCESSOR),
+                  "Failed to create XAudio2.");
+    ThrowIfFailed(xaudio2_->CreateMasteringVoice(&masteringVoice_),
+                  "Failed to create the XAudio2 mastering voice.");
 
-  shotClip_ = LoadPcmWav(GetAssetPath(L"shot_test.wav"));
+    shotClip_ = LoadPcmWav(GetAssetPath(L"shot_test.wav"));
 
-  for (auto &voice : shotVoices_) {
-    ThrowIfFailed(xaudio2_->CreateSourceVoice(&voice, &shotClip_.format),
-                  "Failed to create a shot source voice.");
-    ThrowIfFailed(voice->Start(), "Failed to start a shot source voice.");
+    for (auto &voice : shotVoices_) {
+      ThrowIfFailed(xaudio2_->CreateSourceVoice(&voice, &shotClip_.format),
+                    "Failed to create a shot source voice.");
+      ThrowIfFailed(voice->Start(), "Failed to start a shot source voice.");
+    }
+
+    bgmClip_ = LoadPcmWav(GetAssetPath(L"bgm_test.wav"));
+    ThrowIfFailed(xaudio2_->CreateSourceVoice(&bgmVoice_, &bgmClip_.format),
+                  "Failed to create the BGM source voice.");
+  } catch (...) {
+    DestroyVoices();
+    throw;
   }
-
-  bgmClip_ = LoadPcmWav(GetAssetPath(L"bgm_test.wav"));
-  ThrowIfFailed(xaudio2_->CreateSourceVoice(&bgmVoice_, &bgmClip_.format),
-                "Failed to create the BGM source voice.");
 }
 
-AudioSystem::~AudioSystem() {
-  for (auto *voice : shotVoices_) {
+AudioSystem::~AudioSystem() { DestroyVoices(); }
+
+void AudioSystem::DestroyVoices() noexcept {
+  for (auto *&voice : shotVoices_) {
     if (voice != nullptr) {
       voice->DestroyVoice();
+      voice = nullptr;
     }
   }
   if (bgmVoice_ != nullptr) {
     bgmVoice_->DestroyVoice();
+    bgmVoice_ = nullptr;
   }
   if (masteringVoice_ != nullptr) {
     masteringVoice_->DestroyVoice();
+    masteringVoice_ = nullptr;
   }
 }
 

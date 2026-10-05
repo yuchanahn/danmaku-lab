@@ -68,6 +68,12 @@ std::vector<Window::KeyEvent> Window::ConsumeKeyEvents() {
   return events;
 }
 
+bool Window::ConsumeFocusLost() noexcept {
+  const bool lost = focusLost_;
+  focusLost_ = false;
+  return lost;
+}
+
 std::optional<int> Window::ProcessMessages() const {
   MSG message{};
 
@@ -120,19 +126,42 @@ LRESULT CALLBACK Window::ForwardWindowProc(HWND window, UINT message,
 LRESULT Window::HandleMessage(HWND window, UINT message, WPARAM wParam,
                               LPARAM lParam) {
   switch (message) {
+  case WM_GETMINMAXINFO: {
+    RECT minimumRect{0, 0, kMinimumClientWidth, kMinimumClientHeight};
+    if (AdjustWindowRect(&minimumRect, WS_OVERLAPPEDWINDOW, FALSE) == 0) {
+      return DefWindowProcW(window, message, wParam, lParam);
+    }
+    auto *limits = reinterpret_cast<MINMAXINFO *>(lParam);
+    limits->ptMinTrackSize.x = minimumRect.right - minimumRect.left;
+    limits->ptMinTrackSize.y = minimumRect.bottom - minimumRect.top;
+    return 0;
+  }
+
+  case WM_KILLFOCUS:
+    pendingKeyEvents_.clear();
+    focusLost_ = true;
+    return 0;
+
   case WM_KEYDOWN:
-  case WM_SYSKEYDOWN:
     pendingKeyEvents_.push_back(
         {static_cast<UINT>(wParam), true});
     return 0;
 
+  case WM_SYSKEYDOWN:
+    pendingKeyEvents_.push_back({static_cast<UINT>(wParam), true});
+    return DefWindowProcW(window, message, wParam, lParam);
+
   case WM_KEYUP:
-  case WM_SYSKEYUP:
     pendingKeyEvents_.push_back(
         {static_cast<UINT>(wParam), false});
     return 0;
 
+  case WM_SYSKEYUP:
+    pendingKeyEvents_.push_back({static_cast<UINT>(wParam), false});
+    return DefWindowProcW(window, message, wParam, lParam);
+
   case WM_SIZE:
+    minimized_ = wParam == SIZE_MINIMIZED;
     if (wParam != SIZE_MINIMIZED) {
       clientSize_.width = LOWORD(lParam);
       clientSize_.height = HIWORD(lParam);

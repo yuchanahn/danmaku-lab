@@ -167,7 +167,7 @@ void Graphics::CreateSpriteResources() {
                     vertexBytecode->GetBufferSize(), &inputLayout_),
                 "Failed to create the sprite input layout.");
 
-  static_assert(sizeof(SpriteTintConstants) == 48);
+  static_assert(sizeof(SpriteTintConstants) == 80);
 
   D3D11_BUFFER_DESC constantBufferDesc{};
   constantBufferDesc.ByteWidth = sizeof(SpriteTintConstants);
@@ -454,6 +454,11 @@ void Graphics::DrawSprite(const SpriteDrawData &sprite) {
   spriteTintConstants_.timeSource = static_cast<float>(sprite.timeSource);
   spriteTintConstants_.shape = static_cast<float>(sprite.shape);
   spriteTintConstants_.uvRect = sprite.uvRect;
+  spriteTintConstants_.dissolveProgress = sprite.dissolveProgress;
+  spriteTintConstants_.dissolveNoiseScale = sprite.dissolveNoiseScale;
+  spriteTintConstants_.dissolveEdgeWidth = sprite.dissolveEdgeWidth;
+  spriteTintConstants_.dissolveEdgeStrength = sprite.dissolveEdgeStrength;
+  spriteTintConstants_.dissolveEdgeColor = sprite.dissolveEdgeColor;
   UpdateSpriteTintConstants();
   BindBlendState(sprite.blendMode);
 
@@ -483,7 +488,7 @@ void Graphics::DrawDebugText(std::wstring_view text) {
 }
 
 void Graphics::EndFrame() {
-  ThrowIfFailed(swapChain_->Present(1, 0),
+  ThrowIfFailed(swapChain_->Present(0, 0),
                 "Failed to present the DirectX 11 swap chain.");
 }
 

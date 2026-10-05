@@ -1,8 +1,8 @@
-# Danmaku Shooter
+# Danmaku Lab — Win32 & DirectX 11 Shooter
 
 C++23, Win32, DirectX 11로 만드는 Windows용 2D 탄막 슈팅 학습 프로젝트입니다. 게임 루프, 그래픽 파이프라인, 리소스 수명, 충돌 처리와 UI를 직접 구현하며 클라이언트 프로그래밍의 기반을 익히고 있습니다.
 
-현재 개발 중이며, 플레이어와 보스의 전투 및 클리어/실패 결과 처리가 구현되어 있습니다. 전투 조정, 성능 비교와 코드 정리는 진행 예정입니다.
+보스 하나와 두 탄막 패턴으로 구성된 첫 완성본의 구현과 Release 패키징을 마쳤습니다. 현재는 정교한 아트, 여러 적·보스와 스테이지, 파티클·디졸브 이펙트, UI를 확장하는 단계입니다. 이후 실제 장면을 기준으로 렌더링 병목을 측정하고 개선합니다.
 
 ## 구현 기능
 
@@ -23,6 +23,7 @@ Glow는 스프라이트 셰이더와 블렌딩을 활용한 표현이며, 후처
 ## 개발 환경
 
 - Windows x64
+- 최소 게임 화면(client 영역): 960×540
 - Visual Studio 2022의 MSVC C++ 도구 및 Windows SDK
 - CMake 3.25 이상
 - 기본 언어 표준 C++23 (CMake 옵션으로 C++20 선택 가능)
@@ -55,6 +56,18 @@ cmake --build --preset build-release --parallel
 
 빌드 시 `shaders`와 `assets`를 실행 파일 옆으로 복사합니다. 실행 파일을 다른 곳으로 옮길 때도 두 폴더를 함께 옮겨야 합니다.
 
+## Release 패키지 만들기
+
+```powershell
+.\package.ps1
+```
+
+Release 설정/빌드 후 실행 파일, 이미지·오디오, HLSL, 실행 안내를 `out/packages`의 새 폴더에 모읍니다. 프로젝트 폴더 밖을 작업 경로로 사용해 자동 검사를 실행하고, 성공한 경우 ZIP을 생성합니다. 생성물은 Git에 포함하지 않습니다.
+
+배포 대상 PC에는 [Microsoft Visual C++ v14 x64 Runtime](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)이 필요합니다. 현재 개발 PC에서 검사했으며 다른 PC의 드라이버·런타임 호환성을 모두 검사한 것은 아닙니다.
+
+`--smoke-test`는 숨김 창으로 리소스 로딩과 렌더 경로, 입력 초기화, 체력바 비율, 명중/탄환 소비, 무적, 클리어·실패와 재시작을 확인한 뒤 종료합니다. 성공은 종료 코드 0, 실패는 1이며, 검사 중에는 오류 팝업 대신 표준 오류에 기록합니다.
+
 ## 조작
 
 | 키 | 기능 |
@@ -64,6 +77,7 @@ cmake --build --preset build-release --parallel
 | Z | 연속 발사 |
 | P | 플레이 중 일시정지 / 재개 |
 | F1 | 디버그 패널 표시 / 숨김 |
+| F2 | 어두운 기본 배경 / 밝은 테스트 격자 전환 |
 
 그래픽 실습용 키도 유지하고 있습니다.
 
@@ -78,7 +92,10 @@ cmake --build --preset build-release --parallel
 
 ## 주요 구조
 
-- `Application`: 게임 루프, 입력 연결, 전투 진행과 화면 상태
+- `Application`: 창·게임 루프, 입력 전달, 화면 전환과 오디오 연결
+- `GameScene`: 전투 데이터, 이동·발사·충돌·승패·사망 연출과 전투 렌더 구성
+- `GameHud`: 체력바, 점수·디버그 정보, 타이틀·결과 UI
+- `GameSpriteRenderer`, `PlayfieldLayout`: 시트 UV 선택과 논리 전투 좌표의 화면 변환
 - `Player`, `Enemy`, `BulletSystem`: 게임 데이터와 동작
 - `Collision`, `UniformGrid`: 충돌 판정과 후보 검색
 - `Graphics`: DX11 렌더링 및 Direct2D/DirectWrite 텍스트 출력
@@ -88,20 +105,22 @@ cmake --build --preset build-release --parallel
 - `shaders/Sprite.hlsl`: 스프라이트 셰이더
 - `assets`: 테스트 이미지와 오디오
 
-## 현재 제한 및 남은 작업
+## 현재 범위와 후속 작업
 
-- 보스 패턴과 난이도 조정, 클리어/실패/재시작의 전체 실행 검증
-- 원형 패턴 발사 간격은 현재 1.5초이며 학습 과제 목표는 1.0초
-- 플레이어 체력바는 현재 플레이어 아래쪽에 배치되어 있으며 위쪽 배치 보완 예정
+- 보스 HP120, 전반 회전 부채꼴/후반 원형 탄막, 클리어/실패/재시작을 갖춘 단일 보스 전투
 - 충돌은 각 고정 업데이트의 위치에서 검사하며 CCD는 구현하지 않음
 - BGM은 게임 일시정지 중에도 계속 재생되는 정책
-- 성능 비교 수치와 코드 정리는 아직 진행 전
+- 사망 디졸브와 경계 발광 구현 완료. 여러 적·보스/패턴과 스테이지, 정교한 아트·파티클, 타이틀·결과 UI 강화는 확장 예정
+- 합성 배치의 충돌 CPU 비교는 측정했으며 렌더링 병목 측정은 확장 게임 구현 이후 진행
+- 고DPI/다른 PC 환경의 전체 UI 검증은 미수행
 
 ## 학습 기록
 
 - [현재 진행 상황](docs/PROJECT_STATUS.md)
 - [학습 및 구현 로드맵](docs/ROADMAP.md)
 - [기술 결정과 이유](docs/DECISIONS.md)
+- [충돌 비용 비교 및 실행 방법](docs/COLLISION_BENCHMARK.md)
+- [Release 패키지 검증 범위](docs/RELEASE_VERIFICATION.md)
 - [학습 진행 규칙](AGENTS.md)
 
 이 저장소는 AI의 설명·주변 코드 지원과 직접 구현·리뷰를 병행한 학습 과정을 기록합니다. 구현 완료 여부와 실행 검증 여부는 진행 상황 문서에서 구분합니다.

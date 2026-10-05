@@ -3,8 +3,8 @@
 #include <algorithm>
 
 void Player::Reset() noexcept {
-  x_ = 320.0f;
-  y_ = 240.0f;
+  x_ = 360.0f;
+  y_ = 800.0f;
   shotCooldownSeconds_ = 0.0;
   hp_ = kMaxHp;
   invulnerabilitySeconds_ = 0.0;

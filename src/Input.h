@@ -13,6 +13,7 @@ public:
   };
 
   void BeginFrame() noexcept;
+  void Reset() noexcept;
   void SetKeyDown(UINT virtualKey, bool isDown) noexcept;
 
   [[nodiscard]] KeyState GetKeyState(UINT virtualKey) const noexcept;

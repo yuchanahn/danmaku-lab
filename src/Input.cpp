@@ -4,6 +4,11 @@
 
 void Input::BeginFrame() noexcept { previous_ = current_; }
 
+void Input::Reset() noexcept {
+  current_.fill(false);
+  previous_.fill(false);
+}
+
 void Input::SetKeyDown(UINT virtualKey, bool isDown) noexcept {
   if (virtualKey < kKeyCount) {
     current_[virtualKey] = isDown;

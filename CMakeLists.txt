@@ -20,6 +20,18 @@ file(GLOB DANMAKU_SOURCES CONFIGURE_DEPENDS
 
 add_executable(DanmakuShooter WIN32 ${DANMAKU_SOURCES})
 
+add_executable(CollisionBenchmark
+    tools/collision_benchmark.cpp
+    src/Collision.cpp
+    src/UniformGrid.cpp
+)
+target_include_directories(CollisionBenchmark PRIVATE src)
+target_compile_features(CollisionBenchmark PRIVATE cxx_std_${DANMAKU_CXX_STANDARD})
+set_target_properties(CollisionBenchmark PROPERTIES CXX_EXTENSIONS OFF)
+if(MSVC)
+    target_compile_options(CollisionBenchmark PRIVATE /W4 /permissive- /utf-8)
+endif()
+
 target_compile_features(DanmakuShooter PRIVATE cxx_std_${DANMAKU_CXX_STANDARD})
 
 target_compile_definitions(DanmakuShooter PRIVATE
@@ -50,17 +62,9 @@ add_custom_target(CopyShaders ALL
 add_dependencies(DanmakuShooter CopyShaders)
 
 add_custom_target(CopyAssets ALL
-    COMMAND ${CMAKE_COMMAND} -E make_directory
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
         "$<TARGET_FILE_DIR:DanmakuShooter>/assets"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/player_test.png"
-        "$<TARGET_FILE_DIR:DanmakuShooter>/assets/player_test.png"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/shot_test.wav"
-        "$<TARGET_FILE_DIR:DanmakuShooter>/assets/shot_test.wav"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/assets/bgm_test.wav"
-        "$<TARGET_FILE_DIR:DanmakuShooter>/assets/bgm_test.wav"
 )
 add_dependencies(DanmakuShooter CopyAssets)
 

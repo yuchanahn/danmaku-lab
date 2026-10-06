@@ -1,8 +1,22 @@
 #include "GameSpriteRenderer.h"
+#include "BulletSpriteInstanceData.h"
 #include "Graphics.h"
+#include "SpriteDrawData.h"
+#include <span>
 
 void GameSpriteRenderer::DrawGameSprite(const SpriteDrawData &sprite) const {
   graphics_.DrawSprite(layout_.ToScreen(sprite));
+}
+
+BulletSpriteInstanceData GameSpriteRenderer::MakeScreenBulletInstance(
+    const SpriteDrawData &gameSprite) const {
+  return MakeBulletSpriteInstanceData(layout_.ToScreen(gameSprite));
+}
+
+void GameSpriteRenderer::DrawBulletInstances(
+    std::span<const BulletSpriteInstanceData> screenInstances,
+    SpriteBlendMode blendMode) const {
+  graphics_.DrawBulletInstances(screenInstances, blendMode);
 }
 
 void GameSpriteRenderer::DrawGameSprite(

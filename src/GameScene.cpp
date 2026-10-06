@@ -3,6 +3,7 @@
 #include "DanmakuPattern.h"
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include <numbers>
 
 void GameScene::Reset() {
@@ -27,6 +28,8 @@ void GameScene::Reset() {
   shotRequestCount_ = 0;
   activeEnemyBulletCount_ = 0;
   collisionCandidateCount_ = 0;
+  measureCollision_ = false;
+  collisionBenchmark_ = {};
   StartStage();
 }
 
@@ -80,9 +83,23 @@ bool GameScene::UpdateCombat(const Input &input, double fixedDeltaSeconds) {
     bulletSystem_.Spawn(player_.GetX(),
                         player_.GetY() - player_.GetHeight() * 0.5f);
   }
-  RebuildEnemyBulletGrid();
+  const auto measure = [&](auto &&operation, double &milliseconds) {
+    if (!measureCollision_) {
+      operation();
+      return;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    operation();
+    milliseconds += std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - start).count();
+  };
+  measure([&] { RebuildEnemyBulletGrid(); }, collisionBenchmark_.buildMilliseconds);
   CheckEnemyPlayerBulletCollisions();
-  CheckPlayerEnemyBulletCollisions();
+  measure([&] { CheckPlayerEnemyBulletCollisions(); }, collisionBenchmark_.queryMilliseconds);
+  if (measureCollision_) {
+    ++collisionBenchmark_.ticks;
+    collisionBenchmark_.candidates += collisionCandidateCount_;
+  }
   CheckBattleOutcome();
   if (battleOutcome_ == BattleOutcome::None)
     UpdateStageProgress();
@@ -91,7 +108,7 @@ bool GameScene::UpdateCombat(const Input &input, double fixedDeltaSeconds) {
 }
 
 void GameScene::CheckEnemyPlayerBulletCollisions() {
-  for (auto &bullet : bulletSystem_.GetBullets()) {
+  for (auto &bullet : bulletSystem_.GetMutableBullets()) {
     if (!bullet.active || bullet.owner != BulletOwner::Player)
       continue;
     const CircleHitbox bulletHitbox{
@@ -105,7 +122,7 @@ void GameScene::CheckEnemyPlayerBulletCollisions() {
       if (!Intersects({target.GetX(), target.GetY(), target.GetHitRadius()},
                       bulletHitbox))
         return false;
-      bullet.active = false;
+      bulletSystem_.Release(bullet);
       DamageEnemy(target, 1);
       return true;
     };
@@ -208,7 +225,7 @@ void GameScene::CheckPlayerEnemyBulletCollisions() {
       kPlayerGrazeRadius,
   };
 
-  auto &bullets = bulletSystem_.GetBullets();
+  auto &bullets = bulletSystem_.GetMutableBullets();
   // 두 경로는 후보 선택만 다르고 명중/무적/Graze 처리는 공유한다.
   const auto checkBullet = [&](Bullet &bullet) {
     if (!bullet.active || bullet.owner != BulletOwner::Enemy)
@@ -218,9 +235,9 @@ void GameScene::CheckPlayerEnemyBulletCollisions() {
     ++collisionCandidateCount_;
     const bool bulletHitsPlayer = Intersects(playerHitbox, bulletHitbox);
     if (bulletHitsPlayer) {
-      const bool damageApplied = player_.TryTakeDamage();
+      const bool damageApplied = !godMode_ && player_.TryTakeDamage();
       playerHit_ = playerHit_ || damageApplied;
-      bullet.active = false;
+      bulletSystem_.Release(bullet);
     }
     const bool isGraze =
         Intersects(playerGrazeHitbox, bulletHitbox) && !bulletHitsPlayer;

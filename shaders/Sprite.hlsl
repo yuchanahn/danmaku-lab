@@ -70,7 +70,7 @@ cbuffer FrameConstants : register(b2)
 {
     float gameTimeSeconds;
     float realTimeSeconds;
-    float2 framePadding;
+    float2 frameScreenSize;
 };
 
 static const float kPulsePeriodSeconds = 2.0f;
@@ -193,6 +193,72 @@ float4 PSMain(VSOutput input) : SV_TARGET
         color.a *= ComputeGlowIntensity(input.uv);
     }
     else if (spriteShape > 0.5f)
+    {
+        color.a *= ComputeShapeAlpha(input.uv);
+    }
+    return color;
+}
+
+struct BulletInstanceVSInput
+{
+    float2 position : POSITION;
+    float2 uv : TEXCOORD0;
+    float2 center : CENTER0;
+    float2 size : SIZE0;
+    float4 tint : COLOR0;
+    float2 rotationXAxis : ROTATION0;
+    float2 rotationYAxis : ROTATION1;
+    float shape : SHAPE0;
+};
+
+struct BulletInstanceVSOutput
+{
+    float4 position : SV_POSITION;
+    float2 uv : TEXCOORD0;
+    float4 tint : COLOR0;
+    nointerpolation float shape : TEXCOORD1;
+};
+
+float2 RotateInstanceLocalPosition(float2 localPosition,
+                                   float2 rotationXAxis, float2 rotationYAxis)
+{
+    return localPosition.x * rotationXAxis + localPosition.y * rotationYAxis;
+}
+
+BulletInstanceVSOutput BulletInstanceVSMain(BulletInstanceVSInput input)
+{
+    BulletInstanceVSOutput output;
+    float2 localPosition = float2(input.position.x, -input.position.y) * input.size;
+    float2 rotatedPosition = RotateInstanceLocalPosition(
+        localPosition, input.rotationXAxis, input.rotationYAxis);
+    float2 pixelPosition = input.center + rotatedPosition;
+    float2 ndcPosition = float2(
+        2.0f * pixelPosition.x / frameScreenSize.x - 1.0f,
+        1.0f - 2.0f * pixelPosition.y / frameScreenSize.y);
+    output.position = float4(ndcPosition, 0.0f, 1.0f);
+    output.uv = input.uv;
+    output.tint = input.tint;
+    output.shape = input.shape;
+    return output;
+}
+
+float4 BulletInstancePSMain(BulletInstanceVSOutput input) : SV_TARGET
+{
+    float4 color = spriteTexture.Sample(spriteSampler, input.uv) * input.tint;
+    if (input.shape > 2.5f)
+    {
+        const float kBulletCoreRadius = 0.22f;
+        float normalizedDistance = length(input.uv - float2(0.5f, 0.5f))
+                                   / kBulletCoreRadius;
+        float coreIntensity = saturate(ComputeBulletCoreIntensity(normalizedDistance));
+        color.rgb = lerp(color.rgb, float3(1.0f, 1.0f, 1.0f), coreIntensity);
+        color.a *= ComputeShapeAlpha(input.uv);
+    }
+    else if (input.shape > 1.5f)
+    {
+        color.a *= ComputeGlowIntensity(input.uv);
+    }
+    else if (input.shape > 0.5f)
     {
         color.a *= ComputeShapeAlpha(input.uv);
     }

@@ -3,7 +3,18 @@
 #include "BulletType.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <vector>
+
+enum class BulletAllocationMode { LinearScan, FreeIndexHeap };
+
+struct BulletPoolMeasurement {
+  std::uint64_t spawnCalls = 0;
+  std::uint64_t released = 0;
+  std::uint64_t inspectedSlots = 0;
+  double spawnMilliseconds = 0.0;
+  double releaseMilliseconds = 0.0;
+};
 
 enum class BulletOwner {
   Player,
@@ -26,9 +37,20 @@ struct Bullet {
 class BulletSystem {
 public:
   BulletSystem();
+  BulletSystem(const BulletSystem &) = delete;
+  BulletSystem &operator=(const BulletSystem &) = delete;
 
   void Reset() noexcept;
   void Clear() noexcept;
+  // 같은 슬롯의 중복 반납을 막고 빈 인덱스 목록도 함께 갱신한다.
+  void Release(std::size_t index) noexcept;
+  void Release(Bullet &bullet) noexcept;
+  void SetAllocationMode(BulletAllocationMode mode);
+  void BeginPoolMeasurement() noexcept { measurement_ = {}; measuring_ = true; }
+  void EndPoolMeasurement() noexcept { measuring_ = false; }
+  [[nodiscard]] BulletPoolMeasurement GetPoolMeasurement() const noexcept {
+    return measurement_;
+  }
   [[nodiscard]] std::size_t GetCapacity() const noexcept {
     return bullets_.size();
   }
@@ -46,15 +68,21 @@ public:
 
   [[nodiscard]] std::size_t GetActiveCount() const noexcept;
 
-  [[nodiscard]] std::vector<Bullet> &GetBullets() noexcept { return bullets_; }
-
   [[nodiscard]] const std::vector<Bullet> &GetBullets() const noexcept {
     return bullets_;
   }
 
 private:
+  friend class GameScene;
+  // 위치/Graze 변경은 허용하지만 수명 종료는 반드시 Release를 거친다.
+  [[nodiscard]] std::vector<Bullet> &GetMutableBullets() noexcept { return bullets_; }
+  void RebuildFreeIndices() noexcept;
   static constexpr std::size_t kPoolCapacity = 8192;
   std::vector<Bullet> bullets_;
+  std::vector<std::size_t> freeIndices_;
+  BulletAllocationMode allocationMode_ = BulletAllocationMode::FreeIndexHeap;
+  bool measuring_ = false;
+  BulletPoolMeasurement measurement_;
   std::size_t spawnRequests_ = 0;
   std::size_t droppedSpawnRequests_ = 0;
 };

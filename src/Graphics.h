@@ -1,5 +1,6 @@
 #pragma once
 
+#include "BulletSpriteInstanceData.h"
 #include "ShaderCache.h"
 #include "SpriteDrawData.h"
 #include "TextureCache.h"
@@ -7,6 +8,8 @@
 #include <d2d1.h>
 #include <d3d11.h>
 #include <dwrite.h>
+#include <span>
+#include <string>
 #include <string_view>
 #include <windows.h>
 #include <wrl/client.h>
@@ -34,10 +37,16 @@ public:
   void Resize(UINT width, UINT height);
   void BeginFrame(double gameTimeSeconds, double realTimeSeconds);
   void DrawSprite(const SpriteDrawData &sprite);
+  void DrawBulletInstances(std::span<const BulletSpriteInstanceData> instances,
+                           SpriteBlendMode blendMode);
   void DrawDebugText(std::wstring_view text);
   void DrawUiPanel(std::wstring_view text,
                    const std::array<float, 4> &bounds);
   void EndFrame();
+  [[nodiscard]] std::string GetAdapterName() const;
+  [[nodiscard]] bool WasPresentOccluded() const noexcept {
+    return presentOccluded_;
+  }
 
 private:
   struct SpriteTintConstants {
@@ -56,7 +65,7 @@ private:
   struct FrameConstants {
     float gameTimeSeconds;
     float realTimeSeconds;
-    std::array<float, 2> padding;
+    std::array<float, 2> screenSize;
   };
 
   // HLSL register declarations and these slots form the shader interface.
@@ -64,7 +73,10 @@ private:
   static constexpr UINT kSpriteSamplerSlot = 0;   // s0
   static constexpr UINT kSpriteTransformSlot = 0; // VS b0
   static constexpr UINT kSpriteTintSlot = 1;      // PS b1
-  static constexpr UINT kFrameSlot = 2;           // PS b2
+  static constexpr UINT kFrameSlot = 2;           // VS / PS b2
+  static constexpr UINT kQuadVertexSlot = 0;
+  static constexpr UINT kBulletInstanceSlot = 1;
+  static constexpr std::size_t kBulletInstanceCapacity = 8192;
 
   struct SpriteConstants {
     std::array<float, 2> center;
@@ -82,6 +94,11 @@ private:
   void ReleaseDebugTextRenderTarget();
   void CreateRenderTarget();
   void CreateSpriteResources();
+  void CreateBulletInstanceBuffer();
+  void CreateBulletInstanceInputLayout();
+  void BindBulletInstancePipeline(SpriteBlendMode blendMode);
+  void UploadBulletInstances(
+      std::span<const BulletSpriteInstanceData> instances);
   void CreateSpriteSamplers();
   void CreateAlphaBlendState();
   void CreateAdditiveBlendState();
@@ -113,6 +130,8 @@ private:
   Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout_;
   Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer_;
   Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer_;
+  Microsoft::WRL::ComPtr<ID3D11Buffer> bulletInstanceBuffer_;
+  Microsoft::WRL::ComPtr<ID3D11InputLayout> bulletInstanceInputLayout_;
   ShaderCache shaderCache_;
   TextureCache textureCache_;
   Microsoft::WRL::ComPtr<ID3D11SamplerState> pointClampSampler_;
@@ -126,6 +145,7 @@ private:
                                            {0.0f, 0.0f, 1.0f, 1.0f}};
   Microsoft::WRL::ComPtr<ID3D11Buffer> frameConstantBuffer_;
   FrameConstants frameConstants_{};
+  bool presentOccluded_ = false;
   Microsoft::WRL::ComPtr<ID3D11Buffer> spriteConstantBuffer_;
   SpriteConstants spriteConstants_{};
 };

@@ -74,6 +74,14 @@ if(MSVC)
         /permissive-
         /Zc:__cplusplus
         /utf-8
+        $<$<CONFIG:Release>:/Zi>
+    )
+    # Keep Release optimization while allowing profilers to resolve our code.
+    target_link_options(DanmakuShooter PRIVATE
+        $<$<CONFIG:Release>:/DEBUG:FULL>
+        $<$<CONFIG:Release>:/OPT:REF>
+        $<$<CONFIG:Release>:/OPT:ICF>
+        $<$<CONFIG:Release>:/INCREMENTAL:NO>
     )
 else()
     target_compile_options(DanmakuShooter PRIVATE -Wall -Wextra -Wpedantic)

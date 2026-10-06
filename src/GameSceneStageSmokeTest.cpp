@@ -127,6 +127,9 @@ void GameScene::RunStageSmokeTest(Graphics &graphics,
               bulletSystem_.GetDroppedSpawnRequests() == 0,
           "Final boss did not sustain dense bullets and bounded summons.");
   render();
+  SetInstancedBullets(false);
+  render();
+  SetInstancedBullets(true);
   std::cout << "STAGE TEST PASSED: 1 -> 2 -> 3, peak bullets=" << peakBullets
             << ", dropped=" << bulletSystem_.GetDroppedSpawnRequests() << '\n';
   while (enemy_.GetHp() > 0)

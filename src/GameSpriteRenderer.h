@@ -1,6 +1,8 @@
 #pragma once
 
+#include "BulletSpriteInstanceData.h"
 #include "PlayfieldLayout.h"
+#include <span>
 
 class Graphics;
 
@@ -12,6 +14,10 @@ public:
       : graphics_(graphics), layout_(layout), gameTime_(gameTime),
         realTime_(realTime) {}
   void DrawGameSprite(const SpriteDrawData &sprite) const;
+  [[nodiscard]] BulletSpriteInstanceData
+  MakeScreenBulletInstance(const SpriteDrawData &gameSprite) const;
+  void DrawBulletInstances(std::span<const BulletSpriteInstanceData> screenInstances,
+                           SpriteBlendMode blendMode) const;
   void DrawGameSprite(const SpriteDrawData &sprite,
                       const SpriteAnimationData &animation) const;
   void DrawGameSprite(const SpriteDrawData &sprite,

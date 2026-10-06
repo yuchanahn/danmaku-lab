@@ -1,7 +1,10 @@
+#include "BulletSpriteInstanceData.h"
 #include "GameScene.h"
 #include "GameSpriteRenderer.h"
 #include <cmath>
 #include <numbers>
+#include <algorithm>
+#include <ranges>
 
 void GameScene::Render(const GameSpriteRenderer &renderer) const {
   background_.Render(renderer, gameTimeSeconds_);
@@ -109,13 +112,13 @@ void GameScene::RenderEnemy(const GameSpriteRenderer &renderer) const {
 }
 
 void GameScene::RenderBullets(const GameSpriteRenderer &renderer) const {
-  if (visuals_.enhancedBullets) {
-    // 모든 후광을 먼저 그리고 몸체를 올려 탄의 경계를 유지한다.
-    for (int layer = 0; layer < 2; ++layer) {
+  if (visuals_.enhancedBullets && !visuals_.instancedBullets) {
+    // 최적화 전 경로: 전체 후광 다음 전체 몸체, 탄환마다 상수 갱신/Draw.
+    std::ranges::for_each(std::views::iota(0, 2), [&](int layer) {
       const bool isGlow = layer == 0;
-      for (const auto &bullet : bulletSystem_.GetBullets()) {
-        if (!bullet.active)
-          continue;
+      auto activeBullets = bulletSystem_.GetBullets() |
+          std::views::filter([](const auto &bullet) { return bullet.active; });
+      std::ranges::for_each(activeBullets, [&](const auto &bullet) {
         SpriteDrawData sprite{
             {bullet.x, bullet.y},
             {bullet.width, bullet.height},
@@ -125,29 +128,64 @@ void GameScene::RenderBullets(const GameSpriteRenderer &renderer) const {
                 : std::array<float, 4>{1.0f, 0.18f, 0.12f, 1.0f},
         };
         if (bullet.type == BulletType::Thin &&
-            (bullet.velocityX != 0.0f || bullet.velocityY != 0.0f)) {
-          sprite.rotationRadians =
-              std::atan2(bullet.velocityY, bullet.velocityX);
-        }
-        sprite.shape =
-            isGlow ? SpriteShape::GlowCircle : SpriteShape::BulletBody;
-        sprite.blendMode =
-            isGlow ? visuals_.bulletBlendMode : SpriteBlendMode::Alpha;
+            (bullet.velocityX != 0.0f || bullet.velocityY != 0.0f))
+          sprite.rotationRadians = std::atan2(bullet.velocityY, bullet.velocityX);
+        sprite.shape = isGlow ? SpriteShape::GlowCircle : SpriteShape::BulletBody;
+        sprite.blendMode = isGlow ? visuals_.bulletBlendMode : SpriteBlendMode::Alpha;
         if (isGlow) {
-          constexpr float kGlowPadding = 16.0f;
-          sprite.size[0] += kGlowPadding;
-          sprite.size[1] += kGlowPadding;
+          sprite.size[0] += 16.0f;
+          sprite.size[1] += 16.0f;
           sprite.tint[3] = 0.25f;
         }
         renderer.DrawGameSprite(sprite);
-      }
-    }
+      });
+    });
     return;
   }
-  for (const auto &bullet : bulletSystem_.GetBullets()) {
-    if (!bullet.active) {
-      continue;
-    }
+  if (visuals_.enhancedBullets) {
+    // clear는 용량을 유지하므로 프레임 간 저장 공간을 재사용한다.
+    bulletGlowInstances_.clear();
+    bulletBodyInstances_.clear();
+    bulletGlowInstances_.reserve(bulletSystem_.GetBullets().size());
+    bulletBodyInstances_.reserve(bulletSystem_.GetBullets().size());
+
+    auto activeBullets = bulletSystem_.GetBullets() |
+        std::views::filter([](const auto &bullet) { return bullet.active; });
+    std::ranges::for_each(activeBullets, [&](const auto &bullet) {
+      SpriteDrawData body{
+          {bullet.x, bullet.y},
+          {bullet.width, bullet.height},
+          SpriteTextureId::White,
+          bullet.owner == BulletOwner::Player
+              ? std::array<float, 4>{0.15f, 0.75f, 1.0f, 1.0f}
+              : std::array<float, 4>{1.0f, 0.18f, 0.12f, 1.0f},
+      };
+      if (bullet.type == BulletType::Thin &&
+          (bullet.velocityX != 0.0f || bullet.velocityY != 0.0f)) {
+        body.rotationRadians = std::atan2(bullet.velocityY, bullet.velocityX);
+      }
+      body.shape = SpriteShape::BulletBody;
+      body.blendMode = SpriteBlendMode::Alpha;
+      auto glow = body;
+      glow.shape = SpriteShape::GlowCircle;
+      glow.blendMode = visuals_.bulletBlendMode;
+      constexpr float kGlowPadding = 16.0f;
+      glow.size[0] += kGlowPadding;
+      glow.size[1] += kGlowPadding;
+      glow.tint[3] = 0.25f;
+
+      bulletBodyInstances_.push_back(renderer.MakeScreenBulletInstance(body));
+      bulletGlowInstances_.push_back(renderer.MakeScreenBulletInstance(glow));
+    });
+
+    // 모든 후광을 먼저 그리고 몸체를 올려 탄의 경계를 유지한다.
+    renderer.DrawBulletInstances(bulletGlowInstances_, visuals_.bulletBlendMode);
+    renderer.DrawBulletInstances(bulletBodyInstances_, SpriteBlendMode::Alpha);
+    return;
+  }
+  auto activeBullets = bulletSystem_.GetBullets() |
+      std::views::filter([](const auto &bullet) { return bullet.active; });
+  std::ranges::for_each(activeBullets, [&](const auto &bullet) {
     const float rotation =
         bullet.type == BulletType::Thin &&
                 (bullet.velocityX != 0.0f || bullet.velocityY != 0.0f)
@@ -161,9 +199,8 @@ void GameScene::RenderBullets(const GameSpriteRenderer &renderer) const {
 
     if (visuals_.bulletShape == SpriteShape::GlowCircle) {
       auto glowTint = bulletTint;
-      for (std::size_t channel = 0; channel < 3; ++channel) {
-        glowTint[channel] *= 1.8f;
-      }
+      std::ranges::for_each(glowTint | std::views::take(3),
+                            [](float &channel) { channel *= 1.8f; });
       glowTint[3] = 0.65f;
       const SpriteDrawData glowSprite{
           {bullet.x, bullet.y},
@@ -190,7 +227,7 @@ void GameScene::RenderBullets(const GameSpriteRenderer &renderer) const {
           rotation,
       };
       renderer.DrawGameSprite(coreSprite);
-      continue;
+      return;
     }
 
     const SpriteDrawData bulletSprite{
@@ -205,5 +242,5 @@ void GameScene::RenderBullets(const GameSpriteRenderer &renderer) const {
         rotation,
     };
     renderer.DrawGameSprite(bulletSprite);
-  }
+  });
 }

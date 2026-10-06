@@ -27,4 +27,5 @@ struct PlayfieldLayout {
     result.size = {sprite.size[0] * scale, sprite.size[1] * scale};
     return result;
   }
+
 };

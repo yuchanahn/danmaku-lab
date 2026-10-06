@@ -11,6 +11,8 @@ Graphics::Graphics(HWND window, UINT width, UINT height) {
   CreateDevice(window, width, height);
   shaderCache_.Initialize(device_.Get());
   CreateSpriteResources();
+  CreateBulletInstanceBuffer();
+  CreateBulletInstanceInputLayout();
   CreateSpriteConstantBuffer();
   CreateFrameConstantBuffer();
   textureCache_.Initialize(device_.Get());
@@ -438,6 +440,7 @@ void Graphics::BeginFrame(double gameTimeSeconds, double realTimeSeconds) {
   ClearBackBuffer(clearColor);
   frameConstants_.gameTimeSeconds = static_cast<float>(gameTimeSeconds);
   frameConstants_.realTimeSeconds = static_cast<float>(realTimeSeconds);
+  frameConstants_.screenSize = spriteConstants_.screenSize;
   UpdateFrameConstants();
   BindSpritePipeline();
   context_->PSSetConstantBuffers(kFrameSlot, 1,
@@ -488,7 +491,9 @@ void Graphics::DrawDebugText(std::wstring_view text) {
 }
 
 void Graphics::EndFrame() {
-  ThrowIfFailed(swapChain_->Present(0, 0),
+  const HRESULT presentResult = swapChain_->Present(0, 0);
+  presentOccluded_ = presentResult == DXGI_STATUS_OCCLUDED;
+  ThrowIfFailed(presentResult,
                 "Failed to present the DirectX 11 swap chain.");
 }
 

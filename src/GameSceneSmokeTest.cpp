@@ -24,6 +24,96 @@ void GameScene::RunSmokeTest(Graphics &graphics,
   const auto closeEnough = [](float a, float b) {
     return std::abs(a - b) < 0.00001f;
   };
+  // 생성 슬롯 순서와 풀 고갈/중복 반납/모드 전환을 두 경로에서 비교한다.
+  BulletSystem scanPool;
+  BulletSystem heapPool;
+  scanPool.SetAllocationMode(BulletAllocationMode::LinearScan);
+  for (std::size_t i = 0; i < scanPool.GetCapacity(); ++i) {
+    scanPool.Spawn(static_cast<float>(i), 100.0f);
+    heapPool.Spawn(static_cast<float>(i), 100.0f);
+  }
+  scanPool.Spawn(-1.0f, 100.0f);
+  heapPool.Spawn(-1.0f, 100.0f);
+  require(scanPool.GetDroppedSpawnRequests() == 1 &&
+              heapPool.GetDroppedSpawnRequests() == 1,
+          "Pool exhaustion did not drop exactly one spawn.");
+  for (const std::size_t index : {73u, 2u, 6000u}) {
+    scanPool.Release(index);
+    heapPool.Release(index);
+    heapPool.Release(index); // 이미 반납한 슬롯은 목록에 다시 넣지 않는다.
+  }
+  for (int i = 0; i < 4; ++i) {
+    scanPool.Spawn(-100.0f - i, 100.0f);
+    heapPool.Spawn(-100.0f - i, 100.0f);
+  }
+  require(heapPool.GetActiveCount() == heapPool.GetCapacity() &&
+              heapPool.GetDroppedSpawnRequests() == 2,
+          "Duplicate release corrupted the free-index heap.");
+  for (std::size_t i = 0; i < scanPool.GetCapacity(); ++i)
+    require(scanPool.GetBullets()[i].x == heapPool.GetBullets()[i].x &&
+                scanPool.GetBullets()[i].active == heapPool.GetBullets()[i].active,
+            "Allocation modes changed slot order or bullet contents.");
+  heapPool.SetAllocationMode(BulletAllocationMode::LinearScan);
+  heapPool.Release(9);
+  heapPool.SetAllocationMode(BulletAllocationMode::FreeIndexHeap);
+  heapPool.Spawn(42.0f, 100.0f);
+  require(heapPool.GetBullets()[9].x == 42.0f,
+          "Mode switch did not rebuild free indices.");
+  heapPool.Clear();
+  heapPool.BeginPoolMeasurement();
+  heapPool.Spawn(-1000.0f, -1000.0f);
+  heapPool.RemoveOutside(720.0f, 960.0f);
+  const auto poolTiming = heapPool.GetPoolMeasurement();
+  require(poolTiming.spawnCalls == 1 && poolTiming.released == 1 &&
+              heapPool.GetActiveCount() == 0,
+          "Outside removal or pool measurement omitted lifecycle work.");
+  heapPool.EndPoolMeasurement();
+  heapPool.Spawn(100.0f, 100.0f);
+  require(heapPool.GetPoolMeasurement().spawnCalls == 1,
+          "Pool timing continued after it was disabled.");
+  heapPool.Reset();
+  heapPool.Spawn(100.0f, 100.0f);
+  require(heapPool.GetBullets().front().active &&
+              heapPool.GetSpawnRequests() == 1 &&
+              heapPool.GetDroppedSpawnRequests() == 0,
+          "Pool reset did not restore the first free slot and counters.");
+  for (const auto mode : {CollisionMode::LinearScan, CollisionMode::UniformGrid}) {
+    Reset();
+    SetCollisionMode(mode);
+    SetGodMode(true);
+    const int hpBefore = player_.GetHp();
+    bulletSystem_.Spawn(player_.GetX(), player_.GetY(), 0.0f, 0.0f,
+                        BulletOwner::Enemy);
+    RebuildEnemyBulletGrid();
+    CheckPlayerEnemyBulletCollisions();
+    require(player_.GetHp() == hpBefore && !playerHit_ &&
+                bulletSystem_.GetActiveCount() == 0 && collisionCandidateCount_ > 0,
+            "God mode bypassed collision work or applied damage.");
+    bulletSystem_.Spawn(player_.GetX(), player_.GetY(), 0.0f, 0.0f,
+                        BulletOwner::Enemy);
+    BeginCollisionMeasurement();
+    (void)UpdateCombat(testCombatInput, kFixedDeltaSeconds);
+    const auto collisionTiming = GetCollisionMeasurement();
+    require(collisionTiming.ticks == 1 && collisionTiming.candidates > 0 &&
+                collisionTiming.buildMilliseconds >= 0 &&
+                collisionTiming.queryMilliseconds >= 0,
+            "Collision measurement omitted work or counted ticks incorrectly.");
+    EndCollisionMeasurement();
+    (void)UpdateCombat(testCombatInput, kFixedDeltaSeconds);
+    require(GetCollisionMeasurement().ticks == 1,
+            "Collision timing continued after measurement was disabled.");
+    Reset();
+    require(IsGodMode(), "God mode setting did not survive restart.");
+    SetGodMode(false);
+    bulletSystem_.Spawn(player_.GetX(), player_.GetY(), 0.0f, 0.0f,
+                        BulletOwner::Enemy);
+    RebuildEnemyBulletGrid();
+    CheckPlayerEnemyBulletCollisions();
+    require(player_.GetHp() == hpBefore - 1 && playerHit_,
+            "Damage was not restored after god mode was disabled.");
+  }
+  Reset();
+  SetCollisionMode(CollisionMode::UniformGrid);
   RunStageSmokeTest(graphics, layout);
   // 셀 경계/화면 가장자리에서도 같은 배치의 판정 결과를 비교한다.
   for (const auto position :
@@ -44,7 +134,7 @@ void GameScene::RunSmokeTest(Graphics &graphics,
                         BulletOwner::Player);
     bulletSystem_.Spawn(player_.GetX(), player_.GetY(), 0.0f, 0.0f,
                         BulletOwner::Enemy);
-    bulletSystem_.GetBullets()[5].active = false;
+    bulletSystem_.Release(5);
     const auto initialPlayer = player_;
     const auto initialBullets = bulletSystem_.GetBullets();
     RebuildEnemyBulletGrid();
@@ -57,7 +147,9 @@ void GameScene::RunSmokeTest(Graphics &graphics,
             "Grid counted the same graze more than once.");
 
     player_ = initialPlayer;
-    bulletSystem_.GetBullets() = initialBullets;
+    // 테스트 스냅샷을 복원할 때 파생된 빈 슬롯 목록도 다시 만든다.
+    bulletSystem_.bullets_ = initialBullets;
+    bulletSystem_.RebuildFreeIndices();
     score_ = grazeCount_ = 0;
     SetCollisionMode(CollisionMode::LinearScan);
     RebuildEnemyBulletGrid();

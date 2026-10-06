@@ -26,6 +26,14 @@ Glow는 스프라이트 셰이더와 블렌딩을 활용한 표현이며, 후처
 
 ## 개발 환경
 
+테스트 무적은 **F6**으로 전환합니다. 스테이지별 자동 FPS 측정은 `./benchmark-stage-fps.ps1`로 실행하며, 조건과 지표는 [STAGE_FPS_BENCHMARK.md](docs/STAGE_FPS_BENCHMARK.md)에 설명했습니다.
+
+같은 시나리오에서 개별 Draw와 인스턴스 Draw를 비교하려면 `./benchmark-stage-fps.ps1 -Compare`를 실행합니다.
+
+최종보스 HP50%에서 개별 렌더링을 고정하고 전체 순회와 Uniform Grid를 비교하려면 `./benchmark-stage-fps.ps1 -Grid`를 실행합니다. [측정 결과](docs/measurements/GRID_COMPARISON_2026-10-07.md)에 구축 비용까지 포함한 비교를 기록했습니다.
+
+탄환 풀의 전체 순회/빈 인덱스 최소 힙 비교는 `./benchmark-stage-fps.ps1 -Pool`입니다. 인스턴싱·Grid를 고정하고 FPS와 생성·반납 시간 수집을 분리합니다. [측정 결과](docs/measurements/POOL_COMPARISON_2026-10-07.md)를 확인할 수 있습니다.
+
 - Windows x64
 - 기본 창(client 영역): 1920×1080, 최소960×540, 논리 전투 영역720×960
 - Visual Studio 2022의 MSVC C++ 도구 및 Windows SDK
@@ -84,6 +92,7 @@ Release 설정/빌드 후 실행 파일, 이미지·오디오, HLSL, 실행 안�
 | F2 | 어두운 기본 배경 / 밝은 테스트 격자 전환 |
 | F4 | 테스트 치트: 현재 살아 있는 모든 적·보스에게50 데미지(한 번 누를 때1회) |
 | F5 | 플레이어 대 적 탄환 충돌: Linear Scan ↔ Uniform Grid 전환(기본 Grid, 재시작에도 선택 유지) |
+| F6 | 무적 치트 ON/OFF: HP 감소만 차단, 충돌/탄환 제거 유지, 재시작에도 선택 유지 |
 
 F5 비교는 플레이어와 적 탄환의 충돌/Graze 경로만 바꾼다. Linear Scan은 풀 슬롯을 순회해 모든 활성 적 탄환을 검사하고 Grid 구축을 생략한다. Uniform Grid는 매 고정 업데이트에 Grid를 구축하고 플레이어 주변3×3셀만 검사한다. 명중·무적·탄환 제거·Graze 점수 처리는 공유하며 플레이어 탄환의 적 판정은 기존 전체 순회를 유지한다. 현재 모드는 전투 HUD와 F1 디버그 패널에 표시된다. Collision Candidates는 마지막 충돌 업데이트의 검사 탄환 수이며 시간이 아니다. 일시정지 중 전환하면 후보 수는0으로 초기화되고 재개한 업데이트부터 새 값이 표시된다. 실행 중 전환은 확인용이며 성능 전후 비교는 동일 장면/탄수/Release 조건으로 별도 측정해야 한다.
 

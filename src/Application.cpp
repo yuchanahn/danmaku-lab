@@ -125,6 +125,8 @@ void Application::HandleVisualControls() {
                                     ? CollisionMode::LinearScan
                                     : CollisionMode::UniformGrid);
   }
+  if (input_.GetKeyState(VK_F6) == Input::KeyState::Pressed)
+    gameScene_.SetGodMode(!gameScene_.IsGodMode());
   gameScene_.HandleVisualControls(input_, gameState_ == GameState::Playing);
 }
 

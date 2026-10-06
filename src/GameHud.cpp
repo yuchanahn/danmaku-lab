@@ -105,7 +105,7 @@ void GameHud::RenderScreen(Graphics &graphics_, const GameScene &scene,
     const auto text = std::format(
         L"STAGE {}/3  {}\nHP {}   INVULN {:.1f}s\n{}\nENEMIES {}\nSCORE {}   "
         L"GRAZE {}\nDROPPED SHOTS {}\n{}\nF4: All enemies -50 HP\n"
-        L"F5: Collision {}",
+        L"F5: Collision {}\nF6: God mode {}",
         scene.GetStage().GetStageNumber(), scene.GetStage().GetName(),
         scene.GetPlayer().GetHp(),
         scene.GetPlayer().GetInvulnerabilitySeconds(), bossText,
@@ -118,8 +118,9 @@ void GameHud::RenderScreen(Graphics &graphics_, const GameScene &scene,
             : L"Z: Shoot  P: Pause   F1: Debug",
         scene.GetCollisionMode() == CollisionMode::UniformGrid
             ? L"Uniform Grid"
-            : L"Linear Scan");
-    graphics_.DrawUiPanel(text, {left, 12.0f, left + panelWidth, 270.0f});
+            : L"Linear Scan",
+        scene.IsGodMode() ? L"ON" : L"OFF");
+    graphics_.DrawUiPanel(text, {left, 12.0f, left + panelWidth, 295.0f});
     return;
   }
 

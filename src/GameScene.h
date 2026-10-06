@@ -1,6 +1,7 @@
 #pragma once
 
 #include "BulletSystem.h"
+#include "BulletSpriteInstanceData.h"
 #include "Enemy.h"
 #include "GameState.h"
 #include "Input.h"
@@ -27,6 +28,7 @@ struct SceneVisualSettings {
   SpriteAddressMode playerAddressMode = SpriteAddressMode::Clamp;
   float dissolvePreviewProgress = 0.0f;
   bool enhancedBullets = true;
+  bool instancedBullets = true;
 };
 
 struct SceneStatistics {
@@ -39,6 +41,13 @@ struct SceneStatistics {
   bool playerGraze;
 };
 
+struct CollisionBenchmarkStatistics {
+  std::uint64_t ticks = 0;
+  double buildMilliseconds = 0.0;
+  double queryMilliseconds = 0.0;
+  std::uint64_t candidates = 0;
+};
+
 class GameScene {
 public:
   void Reset();
@@ -46,7 +55,26 @@ public:
   [[nodiscard]] bool Update(const Input &input, double fixedDeltaSeconds);
   void HandleVisualControls(const Input &input, bool allowPreview);
   void ApplyDamageCheat();
+  void SetGodMode(bool enabled) noexcept { godMode_ = enabled; }
+  [[nodiscard]] bool IsGodMode() const noexcept { return godMode_; }
+  void PrepareStageBenchmark(int stageNumber);
+  void SetBulletAllocationMode(BulletAllocationMode mode) {
+    bulletSystem_.SetAllocationMode(mode);
+  }
+  void BeginPoolMeasurement() noexcept { bulletSystem_.BeginPoolMeasurement(); }
+  void EndPoolMeasurement() noexcept { bulletSystem_.EndPoolMeasurement(); }
+  void SetInstancedBullets(bool enabled) noexcept {
+    visuals_.instancedBullets = enabled;
+  }
   void SetCollisionMode(CollisionMode mode);
+  void BeginCollisionMeasurement() noexcept {
+    collisionBenchmark_ = {};
+    measureCollision_ = true;
+  }
+  void EndCollisionMeasurement() noexcept { measureCollision_ = false; }
+  [[nodiscard]] CollisionBenchmarkStatistics GetCollisionMeasurement() const noexcept {
+    return collisionBenchmark_;
+  }
   [[nodiscard]] CollisionMode GetCollisionMode() const noexcept {
     return collisionMode_;
   }
@@ -106,6 +134,9 @@ private:
   StageDirector stage_;
   std::vector<Enemy> minions_;
   BulletSystem bulletSystem_;
+  // const 렌더에서 표시용 저장 공간만 갱신하며 게임 상태는 바꾸지 않는다.
+  mutable std::vector<BulletSpriteInstanceData> bulletGlowInstances_;
+  mutable std::vector<BulletSpriteInstanceData> bulletBodyInstances_;
   CollisionMode collisionMode_ = CollisionMode::UniformGrid;
   UniformGrid enemyBulletGrid_{
       static_cast<std::size_t>(
@@ -122,10 +153,13 @@ private:
   double summonCooldownSeconds_ = 3.0;
   std::size_t bossVolleyIndex_ = 0;
   bool playerHit_ = false;
+  bool godMode_ = false;
   bool playerGraze_ = false;
   std::uint64_t score_ = 0;
   std::uint64_t grazeCount_ = 0;
   std::uint64_t shotRequestCount_ = 0;
   std::size_t activeEnemyBulletCount_ = 0;
   std::size_t collisionCandidateCount_ = 0;
+  bool measureCollision_ = false;
+  CollisionBenchmarkStatistics collisionBenchmark_;
 };

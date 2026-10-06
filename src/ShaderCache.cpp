@@ -63,6 +63,21 @@ void ShaderCache::Initialize(ID3D11Device *device) {
                                           pixelBytecode->GetBufferSize(),
                                           nullptr, &spritePixelShader_),
                 "Failed to create the sprite pixel shader.");
+
+  bulletInstanceVertexBytecode_ =
+      CompileShader(shaderPath, "BulletInstanceVSMain", "vs_5_0");
+  const auto bulletPixelBytecode =
+      CompileShader(shaderPath, "BulletInstancePSMain", "ps_5_0");
+  ThrowIfFailed(device->CreateVertexShader(
+                    bulletInstanceVertexBytecode_->GetBufferPointer(),
+                    bulletInstanceVertexBytecode_->GetBufferSize(), nullptr,
+                    &bulletInstanceVertexShader_),
+                "Failed to create the bullet instance vertex shader.");
+  ThrowIfFailed(device->CreatePixelShader(
+                    bulletPixelBytecode->GetBufferPointer(),
+                    bulletPixelBytecode->GetBufferSize(), nullptr,
+                    &bulletInstancePixelShader_),
+                "Failed to create the bullet instance pixel shader.");
 }
 
 ID3D11VertexShader *ShaderCache::GetSpriteVertexShader() const noexcept {
@@ -75,4 +90,16 @@ ID3D11PixelShader *ShaderCache::GetSpritePixelShader() const noexcept {
 
 ID3DBlob *ShaderCache::GetSpriteVertexBytecode() const noexcept {
   return spriteVertexBytecode_.Get();
+}
+
+ID3D11VertexShader *ShaderCache::GetBulletInstanceVertexShader() const noexcept {
+  return bulletInstanceVertexShader_.Get();
+}
+
+ID3D11PixelShader *ShaderCache::GetBulletInstancePixelShader() const noexcept {
+  return bulletInstancePixelShader_.Get();
+}
+
+ID3DBlob *ShaderCache::GetBulletInstanceVertexBytecode() const noexcept {
+  return bulletInstanceVertexBytecode_.Get();
 }

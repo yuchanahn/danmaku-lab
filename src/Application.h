@@ -17,6 +17,8 @@ public:
   Application &operator=(Application &&) = delete;
   int Run();
   int RunSmokeTest();
+  int RunStageFpsBenchmark(bool compare = false, bool compareGrid = false,
+                           bool comparePool = false);
 
 private:
   void HandlePendingResize();

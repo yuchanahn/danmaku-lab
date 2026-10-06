@@ -29,6 +29,10 @@ void ReportError(const char* message, bool smokeTest) {
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine,
                     int showCommand) {
   const bool smokeTest = std::wstring_view(commandLine) == L"--smoke-test";
+  const bool compare = std::wstring_view(commandLine) == L"--benchmark-stage-fps-compare";
+  const bool compareGrid = std::wstring_view(commandLine) == L"--benchmark-grid";
+  const bool comparePool = std::wstring_view(commandLine) == L"--benchmark-pool";
+  const bool benchmark = compare || compareGrid || comparePool || std::wstring_view(commandLine) == L"--benchmark-stage-fps";
   const HRESULT comResult = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
   if (FAILED(comResult)) {
     ReportError("Failed to initialize COM.", smokeTest);
@@ -38,13 +42,15 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR commandLine,
   int exitCode = EXIT_FAILURE;
   try {
     Application application(instance, smokeTest ? SW_HIDE : showCommand);
-    exitCode = smokeTest ? application.RunSmokeTest() : application.Run();
+    exitCode = smokeTest ? application.RunSmokeTest()
+                        : benchmark ? application.RunStageFpsBenchmark(compare, compareGrid, comparePool)
+                                    : application.Run();
     if (smokeTest) {
       std::cout << "SMOKE TEST PASSED: resources, input, health bars, collision, "
                    "invulnerability, clear, failure and restart.\n";
     }
   } catch (const std::exception& exception) {
-    ReportError(exception.what(), smokeTest);
+    ReportError(exception.what(), smokeTest || benchmark);
   }
 
   CoUninitialize();

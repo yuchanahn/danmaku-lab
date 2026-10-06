@@ -39,12 +39,16 @@ AudioSystem::AudioSystem() {
     for (auto &voice : shotVoices_) {
       ThrowIfFailed(xaudio2_->CreateSourceVoice(&voice, &shotClip_.format),
                     "Failed to create a shot source voice.");
+      ThrowIfFailed(voice->SetVolume(kShotVolume),
+                    "Failed to set the shot volume.");
       ThrowIfFailed(voice->Start(), "Failed to start a shot source voice.");
     }
 
-    bgmClip_ = LoadPcmWav(GetAssetPath(L"bgm_test.wav"));
+    bgmClip_ = LoadPcmWav(GetAssetPath(L"bgm_fairy_battles.wav"));
     ThrowIfFailed(xaudio2_->CreateSourceVoice(&bgmVoice_, &bgmClip_.format),
                   "Failed to create the BGM source voice.");
+    ThrowIfFailed(bgmVoice_->SetVolume(kBgmVolume),
+                  "Failed to set the BGM volume.");
   } catch (...) {
     DestroyVoices();
     throw;
@@ -105,6 +109,12 @@ void AudioSystem::PlayBgm() {
   bgmPlaying_ = true;
 }
 
+std::uint64_t AudioSystem::GetBgmSamplesPlayed() const noexcept {
+  XAUDIO2_VOICE_STATE state{};
+  bgmVoice_->GetState(&state);
+  return state.SamplesPlayed;
+}
+
 void AudioSystem::StopBgm() {
   if (!bgmPlaying_) {
     return;
@@ -131,8 +141,7 @@ AudioSystem::LoadPcmWav(const std::filesystem::path &path) {
   ReadFourCC(stream, wave);
   (void)riffSize;
 
-  if (std::memcmp(riff, "RIFF", 4) != 0 ||
-      std::memcmp(wave, "WAVE", 4) != 0) {
+  if (std::memcmp(riff, "RIFF", 4) != 0 || std::memcmp(wave, "WAVE", 4) != 0) {
     throw std::runtime_error("Invalid WAV RIFF header.");
   }
 
@@ -160,7 +169,8 @@ AudioSystem::LoadPcmWav(const std::filesystem::path &path) {
       clip.format.cbSize = 0;
 
       if (chunkSize > 16) {
-        stream.seekg(static_cast<std::streamoff>(chunkSize - 16), std::ios::cur);
+        stream.seekg(static_cast<std::streamoff>(chunkSize - 16),
+                     std::ios::cur);
       }
       foundFormat = true;
     } else if (std::memcmp(chunkId, "data", 4) == 0) {

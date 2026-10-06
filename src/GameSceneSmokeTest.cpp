@@ -25,6 +25,81 @@ void GameScene::RunSmokeTest(Graphics &graphics,
     return std::abs(a - b) < 0.00001f;
   };
   RunStageSmokeTest(graphics, layout);
+  // 셀 경계/화면 가장자리에서도 같은 배치의 판정 결과를 비교한다.
+  for (const auto position :
+       {std::array{64.0f, 64.0f}, std::array{127.0f, 128.0f},
+        std::array{40.0f, 40.0f}, std::array{680.0f, 920.0f}}) {
+    Reset();
+    SetCollisionMode(CollisionMode::UniformGrid);
+    player_.Update((position[0] - player_.GetX()) / 240.0f,
+                   (position[1] - player_.GetY()) / 240.0f, 1.0);
+    bulletSystem_.Spawn(player_.GetX(), player_.GetY(), 0.0f, 0.0f,
+                        BulletOwner::Enemy);
+    bulletSystem_.Spawn(player_.GetX() + 11.0f, player_.GetY(), 0.0f, 0.0f,
+                        BulletOwner::Enemy, BulletType::Thin);
+    bulletSystem_.Spawn(player_.GetX(), player_.GetY() + 20.0f, 0.0f, 0.0f,
+                        BulletOwner::Enemy);
+    bulletSystem_.Spawn(360.0f, 400.0f, 0.0f, 0.0f, BulletOwner::Enemy);
+    bulletSystem_.Spawn(player_.GetX(), player_.GetY(), 0.0f, 0.0f,
+                        BulletOwner::Player);
+    bulletSystem_.Spawn(player_.GetX(), player_.GetY(), 0.0f, 0.0f,
+                        BulletOwner::Enemy);
+    bulletSystem_.GetBullets()[5].active = false;
+    const auto initialPlayer = player_;
+    const auto initialBullets = bulletSystem_.GetBullets();
+    RebuildEnemyBulletGrid();
+    CheckPlayerEnemyBulletCollisions();
+    const auto gridStats = GetStatistics();
+    const auto gridPlayer = player_;
+    const auto gridBullets = bulletSystem_.GetBullets();
+    CheckPlayerEnemyBulletCollisions();
+    require(score_ == gridStats.score && grazeCount_ == gridStats.grazeCount,
+            "Grid counted the same graze more than once.");
+
+    player_ = initialPlayer;
+    bulletSystem_.GetBullets() = initialBullets;
+    score_ = grazeCount_ = 0;
+    SetCollisionMode(CollisionMode::LinearScan);
+    RebuildEnemyBulletGrid();
+    for (std::size_t y = 0; y < enemyBulletGrid_.GetRows(); ++y)
+      for (std::size_t x = 0; x < enemyBulletGrid_.GetColumns(); ++x)
+        require(enemyBulletGrid_.GetCell(x, y).empty(),
+                "Linear scan rebuilt the grid.");
+    CheckPlayerEnemyBulletCollisions();
+    const auto linearStats = GetStatistics();
+    require(player_.GetHp() == gridPlayer.GetHp() &&
+                player_.GetInvulnerabilitySeconds() ==
+                    gridPlayer.GetInvulnerabilitySeconds() &&
+                linearStats.score == gridStats.score &&
+                linearStats.grazeCount == gridStats.grazeCount &&
+                linearStats.playerHit == gridStats.playerHit &&
+                linearStats.playerGraze == gridStats.playerGraze &&
+                linearStats.activeEnemyBullets ==
+                    gridStats.activeEnemyBullets &&
+                linearStats.collisionCandidates == 4 &&
+                gridStats.collisionCandidates < linearStats.collisionCandidates,
+            "Linear and grid collision results differed.");
+    for (std::size_t i = 0; i < gridBullets.size(); ++i)
+      require(bulletSystem_.GetBullets()[i].active == gridBullets[i].active &&
+                  bulletSystem_.GetBullets()[i].grazed == gridBullets[i].grazed,
+              "Collision modes consumed or grazed different bullets.");
+    CheckPlayerEnemyBulletCollisions();
+    require(score_ == linearStats.score &&
+                grazeCount_ == linearStats.grazeCount,
+            "Linear scan counted the same graze more than once.");
+    SetCollisionMode(CollisionMode::UniformGrid);
+    RebuildEnemyBulletGrid();
+    CheckPlayerEnemyBulletCollisions();
+    require(score_ == linearStats.score &&
+                player_.GetHp() == gridPlayer.GetHp(),
+            "Switching collision modes changed existing bullet state.");
+    SetCollisionMode(CollisionMode::LinearScan);
+    Reset();
+    require(GetCollisionMode() == CollisionMode::LinearScan,
+            "Restart discarded the collision mode selection.");
+  }
+  SetCollisionMode(CollisionMode::UniformGrid);
+  Reset();
   const auto prepareFinalBoss = [&] {
     stage_.Reset();
     stage_.Advance();

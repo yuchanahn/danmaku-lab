@@ -159,8 +159,10 @@ void GameScene::UpdateMinions(double fixedDeltaSeconds) {
 }
 
 void GameScene::RebuildEnemyBulletGrid() {
-  enemyBulletGrid_.Clear();
   activeEnemyBulletCount_ = 0;
+  if (collisionMode_ == CollisionMode::LinearScan)
+    return;
+  enemyBulletGrid_.Clear();
 
   const auto &bullets = bulletSystem_.GetBullets();
   for (std::size_t bulletIndex = 0; bulletIndex < bullets.size();
@@ -206,6 +208,40 @@ void GameScene::CheckPlayerEnemyBulletCollisions() {
       kPlayerGrazeRadius,
   };
 
+  auto &bullets = bulletSystem_.GetBullets();
+  // 두 경로는 후보 선택만 다르고 명중/무적/Graze 처리는 공유한다.
+  const auto checkBullet = [&](Bullet &bullet) {
+    if (!bullet.active || bullet.owner != BulletOwner::Enemy)
+      return;
+    const CircleHitbox bulletHitbox{bullet.x, bullet.y,
+                                    GetBulletStyle(bullet.type).hitRadius};
+    ++collisionCandidateCount_;
+    const bool bulletHitsPlayer = Intersects(playerHitbox, bulletHitbox);
+    if (bulletHitsPlayer) {
+      const bool damageApplied = player_.TryTakeDamage();
+      playerHit_ = playerHit_ || damageApplied;
+      bullet.active = false;
+    }
+    const bool isGraze =
+        Intersects(playerGrazeHitbox, bulletHitbox) && !bulletHitsPlayer;
+    playerGraze_ = playerGraze_ || isGraze;
+    if (isGraze && !bullet.grazed) {
+      bullet.grazed = true;
+      ++grazeCount_;
+      score_ += kGrazeScore;
+    }
+  };
+
+  if (collisionMode_ == CollisionMode::LinearScan) {
+    activeEnemyBulletCount_ = 0;
+    for (auto &bullet : bullets) {
+      if (bullet.active && bullet.owner == BulletOwner::Enemy)
+        ++activeEnemyBulletCount_;
+      checkBullet(bullet);
+    }
+    return;
+  }
+
   const std::size_t playerCellX =
       static_cast<std::size_t>(player_.GetX() / kCollisionGridCellSize);
   const std::size_t playerCellY =
@@ -218,42 +254,22 @@ void GameScene::CheckPlayerEnemyBulletCollisions() {
   const std::size_t maxCellY =
       std::min(playerCellY + 1, enemyBulletGrid_.GetRows() - 1);
 
-  auto &bullets = bulletSystem_.GetBullets();
   for (std::size_t cellY = minCellY; cellY <= maxCellY; ++cellY) {
     for (std::size_t cellX = minCellX; cellX <= maxCellX; ++cellX) {
       for (const std::size_t bulletIndex :
            enemyBulletGrid_.GetCell(cellX, cellY)) {
-        auto &bullet = bullets[bulletIndex];
-        if (!bullet.active) {
-          continue;
-        }
-
-        const CircleHitbox bulletHitbox{
-            bullet.x,
-            bullet.y,
-            GetBulletStyle(bullet.type).hitRadius,
-        };
-
-        ++collisionCandidateCount_;
-        const bool bulletHitsPlayer = Intersects(playerHitbox, bulletHitbox);
-        if (bulletHitsPlayer) {
-          const bool damageApplied = player_.TryTakeDamage();
-          playerHit_ = playerHit_ || damageApplied;
-          bullet.active = false;
-        }
-
-        const bool isGraze =
-            Intersects(playerGrazeHitbox, bulletHitbox) && !bulletHitsPlayer;
-        playerGraze_ = playerGraze_ || isGraze;
-
-        if (isGraze && !bullet.grazed) {
-          bullet.grazed = true;
-          grazeCount_++;
-          score_ += kGrazeScore;
-        }
+        checkBullet(bullets[bulletIndex]);
       }
     }
   }
+}
+
+void GameScene::SetCollisionMode(CollisionMode mode) {
+  if (collisionMode_ == mode)
+    return;
+  collisionMode_ = mode;
+  enemyBulletGrid_.Clear();
+  collisionCandidateCount_ = 0;
 }
 
 void GameScene::CheckBattleOutcome() {

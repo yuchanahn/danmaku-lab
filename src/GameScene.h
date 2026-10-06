@@ -16,6 +16,8 @@
 class GameSpriteRenderer;
 class Graphics;
 
+enum class CollisionMode { LinearScan, UniformGrid };
+
 struct SceneVisualSettings {
   std::array<float, 4> playerUvRect{0.0f, 0.0f, 1.0f, 1.0f};
   SpriteShape bulletShape = SpriteShape::SoftCircle;
@@ -44,6 +46,10 @@ public:
   [[nodiscard]] bool Update(const Input &input, double fixedDeltaSeconds);
   void HandleVisualControls(const Input &input, bool allowPreview);
   void ApplyDamageCheat();
+  void SetCollisionMode(CollisionMode mode);
+  [[nodiscard]] CollisionMode GetCollisionMode() const noexcept {
+    return collisionMode_;
+  }
   void Render(const GameSpriteRenderer &renderer) const;
   [[nodiscard]] const Player &GetPlayer() const { return player_; }
   [[nodiscard]] const Enemy &GetEnemy() const { return enemy_; }
@@ -100,6 +106,7 @@ private:
   StageDirector stage_;
   std::vector<Enemy> minions_;
   BulletSystem bulletSystem_;
+  CollisionMode collisionMode_ = CollisionMode::UniformGrid;
   UniformGrid enemyBulletGrid_{
       static_cast<std::size_t>(
           (kPlayfieldWidth + kCollisionGridCellSize - 1.0f) /

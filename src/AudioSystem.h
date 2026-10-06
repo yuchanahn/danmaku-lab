@@ -20,6 +20,7 @@ public:
   void PlayShot();
   void PlayBgm();
   void StopBgm();
+  [[nodiscard]] std::uint64_t GetBgmSamplesPlayed() const noexcept;
 
 private:
   struct AudioClip {
@@ -28,6 +29,8 @@ private:
   };
 
   static constexpr std::size_t kShotVoiceCount = 8;
+  static constexpr float kBgmVolume = 0.5f;
+  static constexpr float kShotVolume = 0.35f;
 
   static AudioClip LoadPcmWav(const std::filesystem::path &path);
   static std::filesystem::path GetAssetPath(const wchar_t *fileName);

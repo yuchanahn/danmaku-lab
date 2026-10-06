@@ -477,7 +477,7 @@ void Graphics::DrawDebugText(std::wstring_view text) {
   debugTextBrush_->SetColor(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.72f));
   debugTextRenderTarget_->FillRectangle(panelRect, debugTextBrush_.Get());
 
-  constexpr D2D1_RECT_F textRect{22.0f, 18.0f, 420.0f, 460.0f};
+  constexpr D2D1_RECT_F textRect{22.0f, 18.0f, 420.0f, 520.0f};
   debugTextBrush_->SetColor(D2D1::ColorF(D2D1::ColorF::White));
   debugTextRenderTarget_->DrawTextW(
       text.data(), static_cast<UINT32>(text.size()), debugTextFormat_.Get(),

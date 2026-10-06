@@ -19,11 +19,27 @@ int Application::RunSmokeTest() {
 
   Render();
   ChangeGameState(GameState::Playing);
+  input_.SetKeyDown(VK_F5, true);
+  HandleVisualControls();
+  require(gameScene_.GetCollisionMode() == CollisionMode::LinearScan,
+          "F5 did not select linear collision scan.");
+  input_.BeginFrame();
+  HandleVisualControls();
+  require(gameScene_.GetCollisionMode() == CollisionMode::LinearScan,
+          "Holding F5 repeatedly changed collision mode.");
+  input_.Reset();
+  input_.SetKeyDown(VK_F5, true);
+  HandleVisualControls();
+  require(gameScene_.GetCollisionMode() == CollisionMode::UniformGrid,
+          "F5 did not restore grid collision mode.");
+  input_.Reset();
   Render();
   const auto size = window_.GetClientSize();
   const auto layout = PlayfieldLayout::FromClientSize(
       static_cast<float>(size.width), static_cast<float>(size.height));
   gameScene_.RunSmokeTest(graphics_, layout);
+  require(audio_.GetBgmSamplesPlayed() > 0,
+          "BGM voice did not process any audio samples during the game.");
   RunFixedUpdates(kFixedDeltaSeconds);
   require(gameState_ == GameState::Ending,
           "Scene outcome did not change the screen.");

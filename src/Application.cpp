@@ -119,6 +119,12 @@ void Application::HandleVisualControls() {
     debugOverlayVisible_ = !debugOverlayVisible_;
   if (input_.GetKeyState(VK_F2) == Input::KeyState::Pressed)
     brightBackground_ = !brightBackground_;
+  if (input_.GetKeyState(VK_F5) == Input::KeyState::Pressed) {
+    gameScene_.SetCollisionMode(gameScene_.GetCollisionMode() ==
+                                        CollisionMode::UniformGrid
+                                    ? CollisionMode::LinearScan
+                                    : CollisionMode::UniformGrid);
+  }
   gameScene_.HandleVisualControls(input_, gameState_ == GameState::Playing);
 }
 

@@ -104,7 +104,8 @@ void GameHud::RenderScreen(Graphics &graphics_, const GameScene &scene,
                           scene.GetStage().GetSpawnedCount());
     const auto text = std::format(
         L"STAGE {}/3  {}\nHP {}   INVULN {:.1f}s\n{}\nENEMIES {}\nSCORE {}   "
-        L"GRAZE {}\nDROPPED SHOTS {}\n{}\nF4: All enemies -50 HP",
+        L"GRAZE {}\nDROPPED SHOTS {}\n{}\nF4: All enemies -50 HP\n"
+        L"F5: Collision {}",
         scene.GetStage().GetStageNumber(), scene.GetStage().GetName(),
         scene.GetPlayer().GetHp(),
         scene.GetPlayer().GetInvulnerabilitySeconds(), bossText,
@@ -114,8 +115,11 @@ void GameHud::RenderScreen(Graphics &graphics_, const GameScene &scene,
         : frame.state == GameState::Ending ? L"BATTLE ENDING...  P: Pause"
         : scene.GetStage().GetPhase() == StagePhase::Transitioning
             ? L"MID BOSS DEFEATED..."
-            : L"Z: Shoot  P: Pause   F1: Debug");
-    graphics_.DrawUiPanel(text, {left, 12.0f, left + panelWidth, 240.0f});
+            : L"Z: Shoot  P: Pause   F1: Debug",
+        scene.GetCollisionMode() == CollisionMode::UniformGrid
+            ? L"Uniform Grid"
+            : L"Linear Scan");
+    graphics_.DrawUiPanel(text, {left, 12.0f, left + panelWidth, 270.0f});
     return;
   }
 
@@ -167,6 +171,7 @@ void GameHud::RenderDebug(Graphics &graphics_, const GameScene &scene,
         L"FPS: {:.1f}\n"
         L"Bullets: {} / {}\n"
         L"Enemy Bullets: {} | Collision Candidates: {}\n"
+        L"Collision: {} [F5: toggle]\n"
         L"Game: {:.1f}s | Real: {:.1f}s\n"
         L"Pause: {} | Player Hit: {} | Graze: {} | Graze Count: {}\n"
         L"\n"
@@ -185,7 +190,10 @@ void GameHud::RenderDebug(Graphics &graphics_, const GameScene &scene,
         L"N Point  L Linear  C Clamp  W Wrap",
         gameStateName, frame.fps, scene.GetBulletSystem().GetActiveCount(),
         scene.GetBulletSystem().GetBullets().size(), stats.activeEnemyBullets,
-        stats.collisionCandidates, scene.GetGameTimeSeconds(), frame.realTime,
+        stats.collisionCandidates,
+        scene.GetCollisionMode() == CollisionMode::UniformGrid ? L"Uniform Grid"
+                                                               : L"Linear Scan",
+        scene.GetGameTimeSeconds(), frame.realTime,
         frame.paused ? L"On" : L"Off", stats.playerHit ? L"YES" : L"no",
         stats.playerGraze ? L"YES" : L"no", stats.grazeCount, samplerName,
         addressName, visuals.enhancedBullets ? L"Enhanced" : shapeName,

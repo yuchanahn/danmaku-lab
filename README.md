@@ -33,13 +33,13 @@ Glow는 스프라이트 셰이더와 블렌딩을 활용한 표현이며, 후처
 
 ## 개발 환경
 
-테스트 무적은 **F6**으로 전환합니다. 스테이지별 자동 FPS 측정은 `./benchmark-stage-fps.ps1`로 실행하며, 조건과 지표는 [STAGE_FPS_BENCHMARK.md](docs/STAGE_FPS_BENCHMARK.md)에 설명했습니다.
+테스트 무적은 **F6**으로 전환합니다. 스테이지별 자동 FPS 측정은 `./benchmark-stage-fps.ps1`로 실행합니다. 각 구간은 준비 2초·수집 5초이며 CSV를 `out/benchmarks`에 저장합니다.
 
 같은 시나리오에서 개별 Draw와 인스턴스 Draw를 비교하려면 `./benchmark-stage-fps.ps1 -Compare`를 실행합니다.
 
-최종보스 HP50%에서 개별 렌더링을 고정하고 전체 순회와 Uniform Grid를 비교하려면 `./benchmark-stage-fps.ps1 -Grid`를 실행합니다. [측정 결과](docs/measurements/GRID_COMPARISON_2026-10-07.md)에 구축 비용까지 포함한 비교를 기록했습니다.
+최종보스 HP50%에서 개별 렌더링을 고정하고 전체 순회와 Uniform Grid를 비교하려면 `./benchmark-stage-fps.ps1 -Grid`를 실행합니다. 구축·조회 시간과 후보 수를 함께 기록합니다.
 
-탄환 풀의 전체 순회/빈 인덱스 최소 힙 비교는 `./benchmark-stage-fps.ps1 -Pool`입니다. 인스턴싱·Grid를 고정하고 FPS와 생성·반납 시간 수집을 분리합니다. [측정 결과](docs/measurements/POOL_COMPARISON_2026-10-07.md)를 확인할 수 있습니다.
+탄환 풀의 전체 순회/빈 인덱스 최소 힙 비교는 `./benchmark-stage-fps.ps1 -Pool`입니다. 인스턴싱·Grid를 고정하고 FPS와 생성·반납 시간 수집을 분리합니다.
 
 - Windows x64
 - 기본 창(client 영역): 1920×1080, 최소960×540, 논리 전투 영역720×960
@@ -144,14 +144,3 @@ F5 비교는 플레이어와 적 탄환의 충돌/Graze 경로만 바꾼다. Lin
 - 자동 검사에서3스테이지 진행과 최종보스24초 패턴(최대3230발/생성 누락0)을 확인했으며 실제 난이도·가독성은 플레이 검증 필요
 - 합성 배치의 충돌 CPU 비교는 측정했으며 렌더링 병목 측정은 확장 게임 구현 이후 진행
 - 고DPI/다른 PC 환경의 전체 UI 검증은 미수행
-
-## 학습 기록
-
-- [현재 진행 상황](docs/PROJECT_STATUS.md)
-- [학습 및 구현 로드맵](docs/ROADMAP.md)
-- [기술 결정과 이유](docs/DECISIONS.md)
-- [충돌 비용 비교 및 실행 방법](docs/COLLISION_BENCHMARK.md)
-- [Release 패키지 검증 범위](docs/RELEASE_VERIFICATION.md)
-- [학습 진행 규칙](AGENTS.md)
-
-이 저장소는 AI의 설명·주변 코드 지원과 직접 구현·리뷰를 병행한 학습 과정을 기록합니다. 구현 완료 여부와 실행 검증 여부는 진행 상황 문서에서 구분합니다.

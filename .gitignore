@@ -7,3 +7,9 @@
 *.VC.db
 *.VC.opendb
 *.log
+
+# Local learning notes and agent instructions are not published.
+/docs/
+/AGENTS.md
+/.agents/
+/.codex/

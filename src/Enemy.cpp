@@ -14,6 +14,7 @@ Enemy::Enemy(EnemyKind kind, float x, float y)
     shotIntervalSeconds_ = kind == EnemyKind::Enemy1 ? 1.5 : 1.8;
   } else {
     maxHp_ = kind == EnemyKind::FinalBoss ? 240 : 120;
+    hitRadius_ = kind == EnemyKind::FinalBoss ? 56.0f : 24.0f;
     horizontalAmplitude_ = kind == EnemyKind::FinalBoss ? 150.0f : 80.0f;
     horizontalPeriodSeconds_ = kind == EnemyKind::FinalBoss ? 4.0 : 5.0;
   }

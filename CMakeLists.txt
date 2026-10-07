@@ -69,6 +69,9 @@ add_custom_target(CopyAssets ALL
 add_dependencies(DanmakuShooter CopyAssets)
 
 if(MSVC)
+    # Release downloads run without a separate Visual C++ redistributable.
+    set_property(TARGET DanmakuShooter PROPERTY MSVC_RUNTIME_LIBRARY
+        "$<IF:$<CONFIG:Debug>,MultiThreadedDebugDLL,MultiThreaded>")
     target_compile_options(DanmakuShooter PRIVATE
         /W4
         /permissive-

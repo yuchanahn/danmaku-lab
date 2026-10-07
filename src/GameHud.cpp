@@ -105,13 +105,15 @@ void GameHud::RenderScreen(Graphics &graphics_, const GameScene &scene,
     const auto text = std::format(
         L"STAGE {}/3  {}\nHP {}   INVULN {:.1f}s\n{}\nENEMIES {}\nSCORE {}   "
         L"GRAZE {}\nDROPPED SHOTS {}\n{}\nF4: All enemies -50 HP\n"
-        L"F5: Collision {}\nF6: God mode {}",
+        L"F5: Collision {}\nF6: God mode {}\n\nDMG {}  BURST {}\nSHOT INTERVAL {:.3f}s\n"
+        L"ITEMS: Cyan = Fire rate\nOrange = Damage\nPurple = Burst",
         scene.GetStage().GetStageNumber(), scene.GetStage().GetName(),
         scene.GetPlayer().GetHp(),
         scene.GetPlayer().GetInvulnerabilitySeconds(), bossText,
         scene.GetMinions().size(), stats.score, stats.grazeCount,
         scene.GetBulletSystem().GetDroppedSpawnRequests(),
         frame.paused                       ? L"PAUSED  [P: Resume]"
+        : scene.IsCollectingRewards() ? L"STAGE CLEAR! Move to collect items"
         : frame.state == GameState::Ending ? L"BATTLE ENDING...  P: Pause"
         : scene.GetStage().GetPhase() == StagePhase::Transitioning
             ? L"MID BOSS DEFEATED..."
@@ -119,8 +121,9 @@ void GameHud::RenderScreen(Graphics &graphics_, const GameScene &scene,
         scene.GetCollisionMode() == CollisionMode::UniformGrid
             ? L"Uniform Grid"
             : L"Linear Scan",
-        scene.IsGodMode() ? L"ON" : L"OFF");
-    graphics_.DrawUiPanel(text, {left, 12.0f, left + panelWidth, 295.0f});
+        scene.IsGodMode() ? L"ON" : L"OFF", scene.GetPlayer().GetDamage(),
+        scene.GetPlayer().GetBurstCount(), scene.GetPlayer().GetShotInterval());
+    graphics_.DrawUiPanel(text, {left, 12.0f, left + panelWidth, 440.0f});
     return;
   }
 

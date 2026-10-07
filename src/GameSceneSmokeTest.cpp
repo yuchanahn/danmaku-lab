@@ -388,7 +388,7 @@ void GameScene::RunSmokeTest(Graphics &graphics,
   const float frozenBulletY = bulletSystem_.GetBullets()[0].y;
   const auto frozenBulletCount = bulletSystem_.GetActiveCount();
   const double frozenGameTime = gameTimeSeconds_;
-  testCombatInput.SetKeyDown(VK_RIGHT, true);
+  testCombatInput.Reset();
   testCombatInput.SetKeyDown('Z', true);
   for (int i = 0; i < 24; ++i) {
     (void)Update(testCombatInput, kFixedDeltaSeconds);
@@ -404,6 +404,9 @@ void GameScene::RunSmokeTest(Graphics &graphics,
   for (int i = 0; i < 24; ++i) {
     (void)Update(testCombatInput, kFixedDeltaSeconds);
   }
+  require(!IsFinished(), "Result discarded uncollected rewards.");
+  for (int i = 0; i < 600 && !IsFinished(); ++i)
+    (void)Update(testCombatInput, kFixedDeltaSeconds);
   require(IsFinished() && GetDeathDissolveProgress() == 1.0f,
           "Result started before the complete death effect.");
   render();

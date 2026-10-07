@@ -32,6 +32,7 @@ struct Bullet {
   bool grazed = false;
   bool active = false;
   BulletType type = BulletType::Normal;
+  int damage = 1;
 };
 
 class BulletSystem {
@@ -62,7 +63,7 @@ public:
   }
   void Spawn(float centerX, float centerY);
   void Spawn(float centerX, float centerY, float velocityX, float velocityY,
-             BulletOwner owner, BulletType type = BulletType::Normal);
+             BulletOwner owner, BulletType type = BulletType::Normal, int damage = 1);
   void Update(double fixedDeltaSeconds);
   void RemoveOutside(float screenWidth, float screenHeight);
 

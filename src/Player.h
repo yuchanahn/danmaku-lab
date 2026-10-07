@@ -1,8 +1,15 @@
 #pragma once
 
+enum class PlayerUpgrade { FireRate, Damage, Burst };
+
 class Player {
 public:
   void Reset() noexcept;
+  void ApplyUpgrade(PlayerUpgrade kind) noexcept;
+  [[nodiscard]] int GetDamage() const noexcept { return 1 + damageLevel_; }
+  [[nodiscard]] int GetBurstCount() const noexcept { return 1 + burstLevel_; }
+  [[nodiscard]] int GetUpgradeCount() const noexcept { return fireRateLevel_ + damageLevel_ + burstLevel_; }
+  [[nodiscard]] double GetShotInterval() const noexcept;
   void Update(float directionX, float directionY, double fixedDeltaSeconds);
   [[nodiscard]] bool UpdateShooting(bool shootHeld, double fixedDeltaSeconds);
   void ClampToBounds(float screenWidth, float screenHeight);
@@ -26,6 +33,9 @@ private:
   static constexpr int kMaxHp = 3;
   static constexpr double kInvulnerabilityDurationSeconds = 1.0;
   int hp_ = kMaxHp;
+  int fireRateLevel_ = 0;
+  int damageLevel_ = 0;
+  int burstLevel_ = 0;
   double invulnerabilitySeconds_ = 0.0;
   float x_ = 360.0f;
   float y_ = 800.0f;

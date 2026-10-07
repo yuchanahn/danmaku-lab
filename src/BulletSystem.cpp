@@ -74,7 +74,7 @@ void BulletSystem::Spawn(float centerX, float centerY) {
 }
 
 void BulletSystem::Spawn(float centerX, float centerY, float velocityX,
-                         float velocityY, BulletOwner owner, BulletType type) {
+                         float velocityY, BulletOwner owner, BulletType type, int damage) {
   ++spawnRequests_;
   const auto start = measuring_ ? Clock::now() : Clock::time_point{};
   auto target = bullets_.end();
@@ -91,7 +91,7 @@ void BulletSystem::Spawn(float centerX, float centerY, float velocityX,
   if (target != bullets_.end()) {
     const auto style = GetBulletStyle(type);
     *target = Bullet{centerX,      centerY, velocityX, velocityY, style.width,
-                     style.height, owner,   false,     true,      type};
+                     style.height, owner,   false,     true,      type, damage};
   } else {
     ++droppedSpawnRequests_;
   }

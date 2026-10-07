@@ -9,6 +9,7 @@
 #include "PlayfieldLayout.h"
 #include "ScrollingBackground.h"
 #include "StageDirector.h"
+#include "StageRewards.h"
 #include "UniformGrid.h"
 #include <array>
 #include <cstdint>
@@ -80,6 +81,7 @@ public:
   }
   void Render(const GameSpriteRenderer &renderer) const;
   [[nodiscard]] const Player &GetPlayer() const { return player_; }
+  [[nodiscard]] bool IsCollectingRewards() const noexcept { return rewardPending_; }
   [[nodiscard]] const Enemy &GetEnemy() const { return enemy_; }
   [[nodiscard]] bool HasBoss() const noexcept { return bossPresent_; }
   [[nodiscard]] const StageDirector &GetStage() const noexcept {
@@ -105,6 +107,9 @@ public:
 private:
   enum class PlayerMotion { Idle, Left, Right };
   bool UpdateCombat(const Input &input, double fixedDeltaSeconds);
+  void UpdatePlayerMovement(const Input &input, double fixedDeltaSeconds);
+  bool UpdatePlayerShooting(bool held, double fixedDeltaSeconds);
+  void DropStageRewards();
   void UpdateEnemyShooting(double fixedDeltaSeconds);
   void StartStage();
   void UpdateStageProgress();
@@ -128,6 +133,10 @@ private:
   static constexpr std::uint64_t kGrazeScore = 100;
 
   Player player_;
+  StageRewards rewards_;
+  bool rewardPending_ = false;
+  struct PendingPlayerShot { double delay; int damage; };
+  std::vector<PendingPlayerShot> pendingPlayerShots_;
   ScrollingBackground background_;
   Enemy enemy_;
   bool bossPresent_ = false;

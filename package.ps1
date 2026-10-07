@@ -1,3 +1,8 @@
+param(
+    [ValidatePattern('^v?\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$')]
+    [string]$Version
+)
+
 $ErrorActionPreference = 'Stop'
 
 Push-Location $PSScriptRoot
@@ -9,14 +14,22 @@ try {
 
     $packageStamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
     $packageOutput = Join-Path $PSScriptRoot 'out/packages'
-    $packageName = "DanmakuLab-$packageStamp"
+    $packageName = if ($Version) { "DanmakuLab-$Version-windows-x64" } else { "DanmakuLab-$packageStamp-windows-x64" }
     $packageFolder = Join-Path $packageOutput $packageName
-    New-Item -ItemType Directory -Path $packageFolder -Force | Out-Null
+    if (Test-Path -LiteralPath $packageFolder) { throw "Package already exists: $packageFolder" }
+    New-Item -ItemType Directory -Path $packageFolder | Out-Null
 
     $releaseFolder = Join-Path $PSScriptRoot 'out/build/msvc-release/Release'
     Copy-Item -LiteralPath (Join-Path $releaseFolder 'DanmakuShooter.exe') -Destination $packageFolder
-    Copy-Item -LiteralPath (Join-Path $releaseFolder 'assets') -Destination $packageFolder -Recurse
-    Copy-Item -LiteralPath (Join-Path $releaseFolder 'shaders') -Destination $packageFolder -Recurse
+    # Copy current source assets explicitly; build folders can retain deleted files.
+    $packageAssets = Join-Path $packageFolder 'assets'
+    $packageShaders = Join-Path $packageFolder 'shaders'
+    New-Item -ItemType Directory -Path $packageAssets, $packageShaders | Out-Null
+    foreach ($assetName in @('player.png', 'Enemy1.png', 'Enemy2.png', 'boss1.png', 'boss2.png',
+                             'bg0.png', 'bg1.png', 'bgm_fairy_battles.wav', 'shot_test.wav', 'BGM_LICENSE.md')) {
+        Copy-Item -LiteralPath (Join-Path $PSScriptRoot "assets/$assetName") -Destination $packageAssets
+    }
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'shaders/Sprite.hlsl') -Destination $packageShaders
 
     @"
 Danmaku Lab — Windows x64
@@ -24,16 +37,19 @@ Danmaku Lab — Windows x64
 실행: DanmakuShooter.exe
 실행 파일과 assets, shaders 폴더를 함께 보관하세요.
 
-요구 환경: Windows 10/11 x64, DirectX 11 지원 그래픽 환경,
-Microsoft Visual C++ v14 x64 Redistributable.
-런타임 안내: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist
+요구 환경: Windows 10/11 x64, DirectX 11 지원 그래픽 환경.
+Visual C++ 런타임은 실행 파일에 포함되어 별도 설치가 필요하지 않습니다.
 
 Enter: 시작 / 결과 화면에서 타이틀로 복귀
 방향키: 이동   Z: 발사   P: 일시정지
 F1: 디버그 패널   F2: 밝은/어두운 배경
+F4: 모든 적에게 50 데미지   F5: 충돌 방식 전환   F6: 무적 치트
 4/5/6: 사각형/원형/Glow 탄환   7/8: Alpha/Additive
 최소 게임 화면: 960 x 540
-보스 HP 절반 이하에서 원형 패턴, 클리어/실패 후 다시 시작 가능.
+일반 적 10마리 → 중간보스 → 최종보스의 3스테이지 구성.
+스테이지 클리어마다 강화 아이템 2개: 청록 공속 / 주황 공격력 / 보라 연속탄.
+이동해서 직접 먹으세요. 화면 밖으로 놓친 아이템은 소멸합니다.
+클리어/실패 후 다시 시작 가능하며 강화는 새 판에서 초기화됩니다.
 최소화 중 전투/렌더링 정지. BGM은 일시정지/최소화 중에도 재생.
 
 개발 검증 모드: --smoke-test (숨김 창으로 검사 후 종료)
@@ -55,6 +71,8 @@ F1: 디버그 패널   F2: 밝은/어두운 배경
 
     $packageArchive = Join-Path $packageOutput "$packageName.zip"
     Compress-Archive -LiteralPath $packageFolder -DestinationPath $packageArchive
+    $packageHash = (Get-FileHash -LiteralPath $packageArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+    "$packageHash  $packageName.zip" | Set-Content -LiteralPath "$packageArchive.sha256" -Encoding ascii
     Write-Output "Package: $packageFolder"
     Write-Output "Archive: $packageArchive"
 }

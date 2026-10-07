@@ -8,6 +8,9 @@
 
 void GameScene::Reset() {
   player_.Reset();
+  rewards_.Reset();
+  rewardPending_ = false;
+  pendingPlayerShots_.clear();
   enemy_.Reset();
   minions_.clear();
   stage_.Reset();
@@ -35,6 +38,17 @@ void GameScene::Reset() {
 
 bool GameScene::Update(const Input &input, double fixedDeltaSeconds) {
   if (battleOutcome_ == BattleOutcome::None) {
+    if (rewardPending_) {
+      UpdatePlayerMovement(input, fixedDeltaSeconds);
+      rewards_.Update(player_, fixedDeltaSeconds);
+      gameTimeSeconds_ += fixedDeltaSeconds;
+      if (rewards_.Empty()) {
+        rewardPending_ = false;
+        stage_.Advance();
+        StartStage();
+      }
+      return false;
+    }
     stage_.Update(fixedDeltaSeconds);
     if (stage_.GetPhase() == StagePhase::Transitioning) {
       enemy_.Update(fixedDeltaSeconds);
@@ -47,12 +61,15 @@ bool GameScene::Update(const Input &input, double fixedDeltaSeconds) {
     gameTimeSeconds_ += fixedDeltaSeconds;
     return fired;
   }
-  if (IsEnding())
+  if (IsEnding()) {
+    if (battleOutcome_ == BattleOutcome::Clear)
+      UpdatePlayerMovement(input, fixedDeltaSeconds);
     UpdateBattleEnding(fixedDeltaSeconds);
+  }
   return false;
 }
 
-bool GameScene::UpdateCombat(const Input &input, double fixedDeltaSeconds) {
+void GameScene::UpdatePlayerMovement(const Input &input, double fixedDeltaSeconds) {
   float directionX = static_cast<float>(input.IsDown(VK_RIGHT)) -
                      static_cast<float>(input.IsDown(VK_LEFT));
   float directionY = static_cast<float>(input.IsDown(VK_DOWN)) -
@@ -70,19 +87,38 @@ bool GameScene::UpdateCombat(const Input &input, double fixedDeltaSeconds) {
 
   player_.Update(directionX, directionY, fixedDeltaSeconds);
   player_.ClampToBounds(kPlayfieldWidth, kPlayfieldHeight);
+}
+
+bool GameScene::UpdatePlayerShooting(bool held, double fixedDeltaSeconds) {
+  bool fired = false;
+  const auto shoot = [&](int damage) {
+    bulletSystem_.Spawn(player_.GetX(), player_.GetY() - player_.GetHeight() * 0.5f,
+                        0.0f, -480.0f, BulletOwner::Player, BulletType::Thin, damage);
+    ++shotRequestCount_;
+    fired = true;
+  };
+  for (auto &shot : pendingPlayerShots_) {
+    shot.delay -= fixedDeltaSeconds;
+    if (shot.delay <= 0.0) shoot(shot.damage);
+  }
+  std::erase_if(pendingPlayerShots_, [](const auto &shot) { return shot.delay <= 0.0; });
+  if (player_.UpdateShooting(held, fixedDeltaSeconds)) {
+    shoot(player_.GetDamage());
+    for (int i = 1; i < player_.GetBurstCount(); ++i)
+      pendingPlayerShots_.push_back({i * 0.045, player_.GetDamage()});
+  }
+  return fired;
+}
+
+bool GameScene::UpdateCombat(const Input &input, double fixedDeltaSeconds) {
+  UpdatePlayerMovement(input, fixedDeltaSeconds);
 
   bulletSystem_.Update(fixedDeltaSeconds);
 
   UpdateEnemyShooting(fixedDeltaSeconds);
   UpdateMinions(fixedDeltaSeconds);
 
-  const bool fired =
-      player_.UpdateShooting(input.IsDown('Z'), fixedDeltaSeconds);
-  if (fired) {
-    ++shotRequestCount_;
-    bulletSystem_.Spawn(player_.GetX(),
-                        player_.GetY() - player_.GetHeight() * 0.5f);
-  }
+  const bool fired = UpdatePlayerShooting(input.IsDown('Z'), fixedDeltaSeconds);
   const auto measure = [&](auto &&operation, double &milliseconds) {
     if (!measureCollision_) {
       operation();
@@ -123,7 +159,7 @@ void GameScene::CheckEnemyPlayerBulletCollisions() {
                       bulletHitbox))
         return false;
       bulletSystem_.Release(bullet);
-      DamageEnemy(target, 1);
+      DamageEnemy(target, bullet.damage);
       return true;
     };
     if (bossPresent_ && tryHit(enemy_))
@@ -298,18 +334,24 @@ void GameScene::CheckBattleOutcome() {
              enemy_.GetHp() == 0) {
     battleOutcome_ = BattleOutcome::Clear;
     stage_.Finish();
-    bulletSystem_.Clear();
+    DropStageRewards();
     activeEnemyBulletCount_ = collisionCandidateCount_ = 0;
     for (auto &minion : minions_) {
       while (minion.GetHp() > 0)
         (void)minion.TryTakeDamage();
     }
   }
+  if (battleOutcome_ == BattleOutcome::Failed) {
+    rewards_.Reset();
+    pendingPlayerShots_.clear();
+  }
   if (battleOutcome_ != BattleOutcome::None)
     battleEndingSeconds_ = 0.0;
 }
 
 void GameScene::UpdateBattleEnding(double fixedDeltaSeconds) {
+  if (battleOutcome_ == BattleOutcome::Clear)
+    rewards_.Update(player_, fixedDeltaSeconds);
   for (auto &minion : minions_) {
     if (minion.GetLifeState() == EnemyLifeState::Dying)
       minion.Update(fixedDeltaSeconds);
@@ -332,7 +374,8 @@ bool GameScene::IsEnding() const {
 
 bool GameScene::IsFinished() const {
   return battleOutcome_ != BattleOutcome::None &&
-         battleEndingSeconds_ >= kDeathDissolveDurationSeconds;
+         battleEndingSeconds_ >= kDeathDissolveDurationSeconds &&
+         (battleOutcome_ != BattleOutcome::Clear || rewards_.Empty());
 }
 
 SceneStatistics GameScene::GetStatistics() const {

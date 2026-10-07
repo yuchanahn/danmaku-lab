@@ -2,6 +2,12 @@
 
 C++23, Win32, DirectX 11로 만드는 Windows용 2D 탄막 슈팅 학습 프로젝트입니다. 게임 루프, 그래픽 파이프라인, 리소스 수명, 충돌 처리와 UI를 직접 구현하며 클라이언트 프로그래밍의 기반을 익히고 있습니다.
 
+## 게임 다운로드
+
+[Windows x64 게임 다운로드](https://github.com/yuchanahn/danmaku-lab/releases/download/v0.1.0/DanmakuLab-v0.1.0-windows-x64.zip) · [릴리즈 목록](https://github.com/yuchanahn/danmaku-lab/releases)
+
+ZIP 전체를 압축 해제하고 `DanmakuShooter.exe`를 실행하세요. Windows 10/11 x64와 DirectX 11 지원 그래픽 환경이 필요하며 Visual C++ 런타임은 포함되어 있습니다. 실행 파일 옆의 `assets`와 `shaders` 폴더를 함께 보관하세요.
+
 일반 적10마리 → 중간보스 → 일반 적을 소환하는 최종보스의3스테이지 전투를 구현했습니다. 공용 숲·안개 배경, 시트 애니메이션과 사망 디졸브를 연결했으며, 새 아트·추가 파티클·UI 디자인은 확장 중입니다. 이후 최종보스의 대량 탄막 장면에서 렌더링 병목을 측정하고 개선합니다.
 
 ## 구현 기능
@@ -9,6 +15,7 @@ C++23, Win32, DirectX 11로 만드는 Windows용 2D 탄막 슈팅 학습 프로�
 - 60Hz 고정 업데이트, 게임 시간과 실제 시간 분리, 일시정지
 - 방향키 이동, 연속 발사, 8192개 고정 탄환 풀과 생성 누락 카운터
 - 시간표 기반 일반 적10마리, 중간보스·최종보스, HP에 따른 강화 패턴과 적 소환
+- 스테이지 클리어마다 랜덤 강화 아이템 2개: 공속(주기 ×0.8), 공격력(발당 +1), 연속탄(발사 수 +1). 직접 접촉해 습득하며 화면 밖으로 나가면 소멸. 보상 정리 후 다음 스테이지 진행, 새 판에서 초기화
 - 조준 부채꼴/이중 회전 원형 탄막, 보통탄과 얇은 탄
 - 숲·안개2레이어 반복 스크롤,8프레임 캐릭터 시트와 UV 반전
 - 원형 Hitbox, Graze 점수, Uniform Grid 기반 적 탄환 충돌 후보 검색
@@ -72,11 +79,13 @@ cmake --build --preset build-release --parallel
 
 ```powershell
 .\package.ps1
+# 버전이 포함된 배포 파일
+.\package.ps1 -Version v0.1.0
 ```
 
 Release 설정/빌드 후 실행 파일, 이미지·오디오, HLSL, 실행 안내를 `out/packages`의 새 폴더에 모읍니다. 프로젝트 폴더 밖을 작업 경로로 사용해 자동 검사를 실행하고, 성공한 경우 ZIP을 생성합니다. 생성물은 Git에 포함하지 않습니다.
 
-배포 대상 PC에는 [Microsoft Visual C++ v14 x64 Runtime](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)이 필요합니다. 현재 개발 PC에서 검사했으며 다른 PC의 드라이버·런타임 호환성을 모두 검사한 것은 아닙니다.
+Release는 MSVC 런타임을 정적으로 포함하여 별도 Visual C++ Runtime 설치가 필요하지 않습니다. 현재 개발 PC에서 검사했으며 다른 PC의 드라이버·런타임 호환성을 모두 검사한 것은 아닙니다. ZIP과 함께 SHA-256 확인 파일을 생성합니다.
 
 `--smoke-test`는 숨김 창으로 리소스 로딩과 렌더 경로, 입력 초기화, 체력바 비율, 명중/탄환 소비, 무적, 클리어·실패와 재시작을 확인한 뒤 종료합니다. 성공은 종료 코드 0, 실패는 1이며, 검사 중에는 오류 팝업 대신 표준 오류에 기록합니다.
 

@@ -11,6 +11,7 @@ void GameScene::Render(const GameSpriteRenderer &renderer) const {
   RenderPlayer(renderer);
   RenderEnemy(renderer);
   RenderBullets(renderer);
+  rewards_.Render(renderer, gameTimeSeconds_ + battleEndingSeconds_);
 }
 
 void GameScene::RenderPlayer(const GameSpriteRenderer &renderer) const {

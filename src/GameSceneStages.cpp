@@ -10,6 +10,7 @@ void GameScene::SpawnScheduledEnemies() {
 }
 
 void GameScene::StartStage() {
+  pendingPlayerShots_.clear();
   bulletSystem_.Clear();
   enemyBulletGrid_.Clear();
   activeEnemyBulletCount_ = collisionCandidateCount_ = 0;
@@ -25,9 +26,11 @@ void GameScene::StartStage() {
 }
 
 void GameScene::UpdateStageProgress() {
+  if (rewardPending_) return;
   if (stage_.GetStageNumber() == 2 && bossPresent_ && enemy_.GetHp() == 0 &&
       stage_.GetPhase() == StagePhase::Running) {
     stage_.BeginBossTransition();
+    pendingPlayerShots_.clear();
     bulletSystem_.Clear();
     enemyBulletGrid_.Clear();
     activeEnemyBulletCount_ = collisionCandidateCount_ = 0;
@@ -35,9 +38,18 @@ void GameScene::UpdateStageProgress() {
   if (stage_.CanAdvance(minions_.empty(),
                         bossPresent_ &&
                             enemy_.GetLifeState() == EnemyLifeState::Removed)) {
-    stage_.Advance();
-    StartStage();
+    DropStageRewards();
+    rewardPending_ = true;
   }
+}
+
+void GameScene::DropStageRewards() {
+  bulletSystem_.Clear();
+  enemyBulletGrid_.Clear();
+  pendingPlayerShots_.clear();
+  activeEnemyBulletCount_ = collisionCandidateCount_ = 0;
+  playerHit_ = playerGraze_ = false;
+  rewards_.DropPair(player_, kPlayfieldWidth, kPlayfieldHeight);
 }
 
 void GameScene::UpdateEnemyShooting(double fixedDeltaSeconds) {
